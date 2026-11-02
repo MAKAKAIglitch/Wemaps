@@ -103,8 +103,9 @@ Road class must be communicated through a combination of line width, contrast, c
 
 - Give road classes separate widths derived from the OSM-derived transportation class and current zoom.
 - Build visual depth with a darker offset shadow, a thicker casing, and a restrained top highlight.
-- Show dashed lane-like markings only at close zoom on major road classes.
-- Treat these markings as cartographic styling until the chosen tile source exposes reliable lane counts and lane geometry. Do not claim that a decorative dashed line represents every real lane.
+- Show lane divider guides at close zoom, with additional dividers on roads inferred to have three or more lanes.
+- Use explicit lane tags when the tile source exposes them; otherwise estimate a schematic layout from road class.
+- Treat these markings as cartographic styling, not surveyed lane geometry or a guarantee of the exact real-world lane count.
 - Preserve road class hierarchy and avoid making local streets visually compete with motorways.
 
 ### Land cover and vegetation
