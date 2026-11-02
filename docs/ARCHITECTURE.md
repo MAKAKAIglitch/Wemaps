@@ -100,6 +100,7 @@ The names above describe responsibilities; they are not yet implemented Kotlin A
 Provider adapters must expose:
 
 - Required attribution.
+- Availability of required OSM feature properties (including road width, lane structure, and camera tags where supported).
 - Terms and license references.
 - Rate limits and download restrictions.
 - API-key requirements.
