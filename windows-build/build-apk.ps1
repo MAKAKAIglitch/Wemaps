@@ -1,17 +1,17 @@
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-function Invoke-SdkResolver {
+function Invoke-SetupHelper {
     param([string]$ScriptPath)
 
     $ResultFile = Join-Path $env:TEMP ('wemaps-sdk-' + [guid]::NewGuid().ToString('N') + '.txt')
     try {
         & (Join-Path $PSHOME 'powershell.exe') -NoLogo -NoProfile -ExecutionPolicy Bypass -File $ScriptPath -ResultFile $ResultFile | Out-Host
         if ($LASTEXITCODE -ne 0) {
-            throw "Android SDK resolver failed (exit code $LASTEXITCODE)."
+            throw "Setup helper failed: $([IO.Path]::GetFileName($ScriptPath)) (exit code $LASTEXITCODE)."
         }
         if (-not (Test-Path -LiteralPath $ResultFile -PathType Leaf)) {
-            throw 'Android SDK resolver did not return an SDK path.'
+            throw "Setup helper did not return a path: $([IO.Path]::GetFileName($ScriptPath))."
         }
         return [IO.File]::ReadAllText($ResultFile, [System.Text.Encoding]::UTF8).Trim()
     } finally {
@@ -30,8 +30,18 @@ try {
     Write-Host "Project: $ProjectRoot"
     Write-Host ''
 
+    $JavaResolver = Join-Path $PSScriptRoot 'ensure-java.ps1'
+    $ResolvedJava = Invoke-SetupHelper -ScriptPath $JavaResolver
+    if (-not (Test-Path -LiteralPath (Join-Path $ResolvedJava 'bin\java.exe') -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $ResolvedJava 'bin\javac.exe') -PathType Leaf)) {
+        throw "JDK resolver returned an invalid JDK path: $ResolvedJava"
+    }
+    $env:JAVA_HOME = $ResolvedJava
+    $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+    Write-Host "Using JDK: $ResolvedJava"
+
     $SdkResolver = Join-Path $PSScriptRoot 'ensure-android-sdk.ps1'
-    $ResolvedSdk = Invoke-SdkResolver -ScriptPath $SdkResolver
+    $ResolvedSdk = Invoke-SetupHelper -ScriptPath $SdkResolver
 
     $RequiredPlatform = Join-Path $ResolvedSdk 'platforms\android-37.1\android.jar'
     $RequiredAapt2 = Join-Path $ResolvedSdk 'build-tools\36.0.0\aapt2.exe'
