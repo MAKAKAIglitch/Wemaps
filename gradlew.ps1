@@ -238,7 +238,23 @@ if (-not (Test-Path -LiteralPath $GradleExe -PathType Leaf)) {
         Write-Host "Downloading Gradle $GradleVersion..."
         Invoke-WebRequest -Uri $Url -OutFile $ZipFile
 
-        $ActualSha256 = (Get-FileHash -LiteralPath $ZipFile -Algorithm SHA256).Hash.ToLowerInvariant()
+        # Use .NET directly instead of Get-FileHash so the launcher also works
+        # in PowerShell installations where the utility module is not auto-loaded.
+        $Sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $FileStream = [System.IO.File]::OpenRead($ZipFile)
+            try {
+                $HashBytes = $Sha256.ComputeHash($FileStream)
+            }
+            finally {
+                $FileStream.Dispose()
+            }
+            $ActualSha256 = [System.BitConverter]::ToString($HashBytes).Replace("-", "").ToLowerInvariant()
+        }
+        finally {
+            $Sha256.Dispose()
+        }
+
         if ($ActualSha256 -ne $ExpectedSha256) {
             throw "Gradle archive SHA-256 mismatch. Downloaded file was not installed."
         }
