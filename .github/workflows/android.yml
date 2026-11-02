@@ -102,7 +102,8 @@ jobs:
           $fakeManager = @'
           @echo off
           setlocal EnableExtensions
-          if /I "%~2"=="--licenses" exit /b 0
+          echo(%*|findstr.exe /I /C:"--licenses" >nul
+          if not errorlevel 1 exit /b 0
           set "SDK_ARG=%~1"
           set "SDK_ARG=%SDK_ARG:--sdk_root=%"
           if /I "%SDK_ARG%"=="%WEMAPS_FAKE_MANAGED_SDK%" (
