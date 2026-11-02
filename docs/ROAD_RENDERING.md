@@ -104,7 +104,7 @@ Keep three provenance states separate in the internal model: mapped width, estim
 
 ## 6. Route-aware lane geometry and markings
 
-The intended interaction is detailed lane geometry at close zoom and route-aware lane highlighting. When lane matching is available, lanes compatible with the route should be highlighted in a bright tone, other lanes should be muted, and valid lane-turn values may be shown as per-lane arrows. Wemaps must implement its own rendering, algorithms, assets, and interaction design.
+The intended future interaction is detailed lane geometry at close zoom and route-aware lane highlighting. The current prototype only draws lane-divider guides from a limited Overpass viewport query; it does not yet provide per-lane turn arrows or route-aware lane matching. When those features are implemented, route-compatible lanes should be highlighted in a bright tone, other lanes should be muted, and valid lane-turn values may be shown as per-lane arrows. Wemaps must implement its own rendering, algorithms, assets, and interaction design.
 
 ### Lane geometry inputs
 
@@ -132,9 +132,11 @@ Use available OSM attributes:
 
 ### Current Android prototype
 
-The Android map currently requests foreground-only coarse/fine location permission. With permission, it reads Android's GPS provider (fine permission) and network provider, places a live map feature at the returned coordinates, and rotates its pointer only when Android reports a usable course while moving. It does not collect background location. The camera moves to the first valid fix; the location control recentres the map later.
+The Android map requests foreground-only coarse/fine location permission. With permission, it reads Android's GPS provider (fine permission) and network provider (approximate permission uses the network provider). A custom MapLibre GeoJSON/SymbolLayer pointer is anchored to the returned coordinate. A course bearing is applied only when Android reports a usable bearing while moving; no unreliable compass heading is invented while stationary. Updates stop when the Activity leaves the started state. The first valid fix moves the camera to the device, and the location control recentres it later. The current UI does not yet expose accuracy or speed.
 
-For road detail, the prototype requests OSM ways inside the visible viewport from the Overpass API once the map is zoomed in. Requests are bounded, rate-limited, performed off the main thread, and discarded if a newer viewport request supersedes them. Ways with `lanes`, directional lane counts, `width`, `est_width`, `width:lanes`, or lane-marking tags can contribute generated divider guides. `lane_markings=no` suppresses separators. The guide geometry is offset from the OSM road centreline, so it remains schematic even when `lane_markings=yes`; that tag confirms the presence of markings, not their exact mapped paint geometry. The base map remains available if Overpass is unavailable or rate-limits the request.
+For road detail, the prototype requests highway ways inside the current visible viewport from the Overpass API at zoom 15.5 and closer. The bounding box is limited to approximately 0.04° latitude by 0.06° longitude; requests run on one background worker, are rate-limited to at least 12 seconds, and a response is ignored after a newer viewport request supersedes it. The current viewport result is reused for up to three minutes. The query selects ways with lane counts, directional lane counts, lane-marking tags, or turn-lane tags; accompanying `width`, `est_width`, and `width:lanes` values are used when present.
+
+`lane_markings=no` suppresses generated separators. For `lane_markings=yes`, the layer is bright because OSM records that markings exist, but the displayed separator coordinates are still derived from the way centreline, total width/lane count, and local offsets. They are not the exact mapped paint geometry. When the lane-marking tag is absent, generated guides are muted and explicitly schematic. No per-lane turn arrows or route-compatible lane matching are drawn yet. If Overpass is unavailable or rate-limits the request, only this supplementary overlay is unavailable; the base map remains usable.
 
 ### Generated geometry limitations
 
