@@ -152,7 +152,7 @@ fun MapLibreMapView(
                     )
                 )
 
-                currentOnStyleReady(map, layers.buildingsAvailable)
+                currentOnStyleReady(map, layers)
             }
         }
     }
