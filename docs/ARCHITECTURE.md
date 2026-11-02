@@ -92,6 +92,7 @@ Planned conceptual interfaces:
 - SearchProvider — address and place search.
 - RoutingProvider — route calculation and navigation instructions.
 - WeatherProvider — current conditions and forecast.
+- CameraDataProvider — bounded speed-camera and enforcement data for a viewport or route corridor.
 - Optional OfflineRegionProvider — later region packaging and download behavior.
 
 The names above describe responsibilities; they are not yet implemented Kotlin APIs.
@@ -120,24 +121,31 @@ The default camera is tilted and perspective-oriented. Map labels, road widths, 
 
 Road rendering should use source geometry and attributes without confusing physical measurements with cartographic styling.
 
-- Read supported OSM width attributes (`width`, `est_width`, lane-width tags) and lane information where present.
+- Read supported OSM width attributes (`width`, `est_width`, `width:lanes`, and directional lane-width tags) and lane information where present.
 - Preserve width provenance in the domain model: mapped width, estimated width, or renderer fallback.
-- If no width is mapped, derive a visual width from road class and zoom. This is a display fallback, not an OSM fact.
-- Use layered MapLibre line styles for casing and road surface. Lane separators may be rendered from lane structure when exact marking geometry is unavailable; identify them as schematic rendering.
+- Convert physical metres to screen-space widths using map zoom, latitude, projection, and camera pitch. A renderer fallback is a display approximation, not an OSM fact.
+- Use layered MapLibre line styles for casing and road surface.
+- Use `lane_markings`, `lanes`, `turn:lanes`, `change`, `overtaking`, and `road_marking` where supplied by the source.
+- Respect `lane_markings=no`. If exact paint geometry is unavailable, derived lane guides must be marked as schematic in the internal model and visually distinct from mapped markings.
 - Keep road styling zoom-aware and test divided roads, ramps, and intersections.
 
 ## 5B. Bounded map-data loading
 
-The renderer and data layer must be viewport-driven, not a global OSM preparation job.
+The renderer and data layer must be viewport-driven, not a global OSM preparation job. Road tiles and camera objects are independent data pipelines.
 
-- Fetch only the vector tiles required by the current viewport and zoom, plus a bounded corridor around an active route when needed.
-- Do not enumerate or preprocess all OSM roads or speed cameras on startup.
-- Debounce viewport changes, cancel requests that are no longer relevant, and deduplicate features across tile boundaries.
+- Fetch only vector tiles required by the current viewport and zoom, plus a bounded corridor around an active route when needed.
+- Never enumerate or preprocess all OSM roads or speed cameras on startup.
+- CameraDataProvider requests must be asynchronous and bounded to visible bounds plus a buffer, or to the active route corridor.
+- Road rendering and map interaction must continue if camera retrieval, parsing, or indexing is slow, rate-limited, or unavailable.
+- Debounce viewport/route changes, cancel obsolete requests, and ignore late responses for stale viewports.
 - Parse and normalize features on background dispatchers; never perform bulk parsing or spatial indexing on the main thread.
+- Cache camera features incrementally and use a spatial index such as SQLite R*Tree for local proximity queries.
+- Deduplicate features across tile boundaries by stable source identity where possible.
 - Use progressive rendering, bounded concurrent requests, caching, geometry simplification, and zoom-dependent layer visibility.
-- Cluster or hide low-priority camera markers at small scales; reveal individual devices as the user zooms in.
+- Cluster or hide camera markers at small scales; reveal individual devices as the user zooms in.
 - Keep queues and caches bounded and expose loading/error states without blocking map interaction.
-- Instrument startup latency, dropped frames, CPU, memory, and network usage.
+- Instrument time to first map frame, frame pacing during gestures, CPU, memory, and network usage.
+
 
 ## 6. Location and speed
 
