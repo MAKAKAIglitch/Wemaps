@@ -1,6 +1,6 @@
 @echo off
-setlocal EnableExtensions DisableDelayedExpansion
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0build-apk.ps1" %*
+setlocal EnableExtensions
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0build-apk.ps1"
 set "BUILD_EXIT=%ERRORLEVEL%"
-if /i not "%CI%"=="true" pause
+if not "%WEMAPS_NO_PAUSE%"=="1" pause
 exit /b %BUILD_EXIT%
