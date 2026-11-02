@@ -1,0 +1,338 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResultFile
+)
+
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+$RequiredPlatform = 'android-37.1'
+$RequiredBuildTools = '36.0.0'
+$script:SdkRoots = New-Object 'System.Collections.Generic.List[string]'
+$script:SeenSdkRoots = @{}
+
+function Add-SdkRoot {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return }
+    $Expanded = [Environment]::ExpandEnvironmentVariables($Path.Trim().Trim('"'))
+    $Expanded = $Expanded.Replace('$USER_HOME$', $env:USERPROFILE).Replace('/', '\')
+    if (-not (Test-Path -LiteralPath $Expanded -PathType Container)) { return }
+
+    try {
+        $Key = [IO.Path]::GetFullPath($Expanded).TrimEnd('\').ToLowerInvariant()
+    } catch {
+        $Key = $Expanded.TrimEnd('\').ToLowerInvariant()
+    }
+
+    if (-not $script:SeenSdkRoots.ContainsKey($Key)) {
+        $script:SeenSdkRoots[$Key] = $true
+        $script:SdkRoots.Add($Expanded) | Out-Null
+    }
+}
+
+function Read-SdkDirFromProperties {
+    param([string]$FilePath)
+
+    if (-not (Test-Path -LiteralPath $FilePath -PathType Leaf)) { return }
+    $Line = Get-Content -LiteralPath $FilePath -ErrorAction SilentlyContinue |
+        Where-Object { $_ -match '^\s*sdk\.dir\s*=' } |
+        Select-Object -First 1
+    if (-not $Line) { return }
+
+    $Value = $Line -replace '^\s*sdk\.dir\s*=\s*', ''
+    # local.properties follows Java-properties escaping (for example C\:\\Android\\Sdk).
+    $Value = [regex]::Replace($Value, '\\(.)', '$1')
+    Add-SdkRoot -Path $Value
+}
+
+function Find-SdkManager {
+    param([string]$Root)
+
+    $Preferred = Join-Path $Root 'cmdline-tools\latest\bin\sdkmanager.bat'
+    if (Test-Path -LiteralPath $Preferred -PathType Leaf) { return $Preferred }
+
+    $ToolsRoot = Join-Path $Root 'cmdline-tools'
+    if (Test-Path -LiteralPath $ToolsRoot -PathType Container) {
+        $ToolDirs = Get-ChildItem -LiteralPath $ToolsRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending
+        foreach ($ToolDir in $ToolDirs) {
+            $Possible = Join-Path $ToolDir.FullName 'bin\sdkmanager.bat'
+            if (Test-Path -LiteralPath $Possible -PathType Leaf) { return $Possible }
+        }
+    }
+
+    $Legacy = Join-Path $Root 'tools\bin\sdkmanager.bat'
+    if (Test-Path -LiteralPath $Legacy -PathType Leaf) { return $Legacy }
+    return $null
+}
+
+function Test-SdkComplete {
+    param([string]$Root)
+
+    $PlatformJar = Join-Path $Root "platforms\$RequiredPlatform\android.jar"
+    $BuildToolsRoot = Join-Path $Root "build-tools\$RequiredBuildTools"
+    return (
+        (Test-Path -LiteralPath $PlatformJar -PathType Leaf) -and
+        (Test-Path -LiteralPath (Join-Path $BuildToolsRoot 'aapt2.exe') -PathType Leaf) -and
+        (Test-Path -LiteralPath (Join-Path $BuildToolsRoot 'zipalign.exe') -PathType Leaf)
+    )
+}
+
+function Write-SdkResult {
+    param([string]$Root)
+
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $ResultFile)) | Out-Null
+    [IO.File]::WriteAllText(
+        $ResultFile,
+        [IO.Path]::GetFullPath($Root),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+
+function Get-FileSha256 {
+    param([string]$FilePath)
+
+    $Algorithm = [System.Security.Cryptography.SHA256]::Create()
+    $Stream = $null
+    try {
+        $Stream = [IO.File]::OpenRead($FilePath)
+        return [BitConverter]::ToString($Algorithm.ComputeHash($Stream)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        if ($null -ne $Stream) { $Stream.Dispose() }
+        if ($null -ne $Algorithm) { $Algorithm.Dispose() }
+    }
+}
+
+Write-Host 'Wemaps: searching for the Android SDK already installed on this computer...'
+
+# Explicit Android SDK environment variables have the highest priority.
+Add-SdkRoot -Path $env:ANDROID_SDK_ROOT
+Add-SdkRoot -Path $env:ANDROID_HOME
+
+# Read the current project's local.properties.
+$ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+Read-SdkDirFromProperties -FilePath (Join-Path $ProjectRoot 'local.properties')
+
+# Standard SDK locations, including the usual Android Studio installation paths.
+@(
+    (Join-Path $env:LOCALAPPDATA 'Android\Sdk'),
+    (Join-Path $env:USERPROFILE 'AppData\Local\Android\Sdk'),
+    (Join-Path $env:ProgramFiles 'Android\Sdk'),
+    (Join-Path $env:ProgramFiles 'Android\Android Studio\sdk'),
+    (Join-Path $env:USERPROFILE 'Android\Sdk'),
+    'C:\Android\Sdk'
+) | ForEach-Object { Add-SdkRoot -Path $_ }
+
+# Android Studio stores SDK/JDK configuration in versioned IDE option XML files.
+foreach ($ConfigRoot in @(
+    (Join-Path $env:APPDATA 'Google'),
+    (Join-Path $env:LOCALAPPDATA 'Google')
+)) {
+    if (-not (Test-Path -LiteralPath $ConfigRoot -PathType Container)) { continue }
+
+    Get-ChildItem -LiteralPath $ConfigRoot -Directory -Filter 'AndroidStudio*' -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $OptionsRoot = Join-Path $_.FullName 'options'
+            if (-not (Test-Path -LiteralPath $OptionsRoot -PathType Container)) { return }
+
+            Get-ChildItem -LiteralPath $OptionsRoot -Filter '*.xml' -File -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    try {
+                        [xml]$Document = Get-Content -LiteralPath $_.FullName -Raw
+                        foreach ($Attribute in $Document.SelectNodes('//@*')) {
+                            $Value = [string]$Attribute.Value
+                            if ($Value -match '^(?:[A-Za-z]:[\\/]|\\\\|\$USER_HOME\$|%USERPROFILE%)') {
+                                Add-SdkRoot -Path $Value
+                            }
+                        }
+                    } catch {
+                        # An unrelated or malformed IDE settings file is not an SDK candidate.
+                    }
+                }
+        }
+}
+
+# Reuse SDK paths saved by other Android/IntelliJ projects under common project directories.
+$ProjectSearchRoots = @(
+    (Join-Path $env:USERPROFILE 'AndroidStudioProjects'),
+    (Join-Path $env:USERPROFILE 'IdeaProjects'),
+    (Join-Path $env:USERPROFILE 'Projects'),
+    (Join-Path $env:USERPROFILE 'source\repos'),
+    (Join-Path $env:USERPROFILE 'Documents\AndroidStudioProjects'),
+    (Join-Path $env:USERPROFILE 'Documents\GitHub')
+)
+foreach ($SearchRoot in $ProjectSearchRoots) {
+    if (Test-Path -LiteralPath $SearchRoot -PathType Container) {
+        Get-ChildItem -LiteralPath $SearchRoot -Filter 'local.properties' -File -Recurse -ErrorAction SilentlyContinue |
+            ForEach-Object { Read-SdkDirFromProperties -FilePath $_.FullName }
+    }
+}
+
+# PATH may contain platform-tools or Android command-line tools rather than the SDK root itself.
+foreach ($PathEntry in ($env:PATH -split [regex]::Escape([IO.Path]::PathSeparator))) {
+    $Entry = $PathEntry.Trim().Trim('"')
+    if ([string]::IsNullOrWhiteSpace($Entry)) { continue }
+
+    if ($Entry -match '(?i)\\platform-tools\\?$') {
+        Add-SdkRoot -Path (Split-Path -Parent $Entry)
+    } elseif ($Entry -match '(?i)\\cmdline-tools\\[^\\]+\\bin\\?$') {
+        $Root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $Entry))
+        Add-SdkRoot -Path $Root
+    } elseif ($Entry -match '(?i)\\tools\\bin\\?$') {
+        Add-SdkRoot -Path (Split-Path -Parent (Split-Path -Parent $Entry))
+    }
+}
+
+# Legacy SDK Manager registry entries are still present on some Windows installations.
+foreach ($RegistryPath in @(
+    'HKCU:\Software\Android SDK Tools',
+    'HKLM:\SOFTWARE\Android SDK Tools',
+    'HKLM:\SOFTWARE\WOW6432Node\Android SDK Tools'
+)) {
+    if (Test-Path $RegistryPath) {
+        $RegistrySettings = Get-ItemProperty -LiteralPath $RegistryPath -ErrorAction SilentlyContinue
+        if ($RegistrySettings.Path) { Add-SdkRoot -Path $RegistrySettings.Path }
+    }
+}
+
+# A complete SDK is reused immediately. No SDK packages are downloaded in this case.
+foreach ($Root in $script:SdkRoots) {
+    if (Test-SdkComplete -Root $Root) {
+        Write-Host "Using existing Android SDK: $Root"
+        Write-SdkResult -Root $Root
+        exit 0
+    }
+}
+
+# If no SDK path was discovered, allow selecting the already-installed SDK folder.
+if ($script:SdkRoots.Count -eq 0) {
+    if ($env:CI -eq 'true') {
+        throw 'Android SDK was not found in CI. Set ANDROID_HOME/ANDROID_SDK_ROOT or provide local.properties.'
+    }
+
+    Write-Host 'Automatic search did not find the SDK. Select its existing root folder.'
+    Add-Type -AssemblyName System.Windows.Forms
+    $Dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $Dialog.Description = 'Select the existing Android SDK folder (the folder containing platforms and build-tools)'
+    $Dialog.ShowNewFolderButton = $false
+    try {
+        if ($Dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+            throw 'Android SDK folder selection was cancelled.'
+        }
+        Add-SdkRoot -Path $Dialog.SelectedPath
+    } finally {
+        $Dialog.Dispose()
+    }
+}
+
+if ($script:SdkRoots.Count -eq 0) {
+    throw 'No existing Android SDK folder was selected or detected.'
+}
+
+# Pick an SDK root that already has sdkmanager, so only the missing Wemaps packages need installation.
+$SdkRoot = $null
+$SdkManager = $null
+foreach ($Root in $script:SdkRoots) {
+    $Manager = Find-SdkManager -Root $Root
+    if ($Manager) {
+        $SdkRoot = $Root
+        $SdkManager = $Manager
+        break
+    }
+}
+
+if (-not $SdkRoot) {
+    # Keep using the first detected SDK root; the official command-line tools can be added there.
+    $SdkRoot = $script:SdkRoots[0]
+    Write-Host "No sdkmanager was found in the existing SDK at: $SdkRoot"
+    Write-Host 'Wemaps needs Android SDK Platform 37.1 and Build-Tools 36.0.0.'
+    Write-Host 'The existing SDK will be kept. The official Android command-line tools will be added alongside it.'
+    Write-Host 'You will be asked before any download, package installation, or SDK license acceptance.'
+
+    if ($env:CI -eq 'true') {
+        throw 'The CI SDK is missing required packages or sdkmanager. Install Platform 37.1 and Build-Tools 36.0.0 in the CI image.'
+    }
+
+    $Answer = Read-Host 'Download the official command-line tools and install only the missing Wemaps SDK packages? [Y/N]'
+    if ($Answer -notmatch '^(?i)y(es)?$') {
+        throw 'Android SDK package installation was declined.'
+    }
+
+    $ToolsUrl = 'https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip'
+    $ExpectedToolsHash = '90ae805d20434428bffcb699c290860f19bb5f66a67e6b330067e3de801fb04a'
+    $ZipPath = Join-Path $env:TEMP ('wemaps-android-tools-' + [guid]::NewGuid().ToString('N') + '.zip')
+    $ExtractRoot = Join-Path $env:TEMP ('wemaps-android-tools-' + [guid]::NewGuid().ToString('N'))
+
+    try {
+        Write-Host 'Downloading official Android command-line tools...'
+        Invoke-WebRequest -Uri $ToolsUrl -OutFile $ZipPath -UseBasicParsing
+        $ActualHash = Get-FileSha256 -FilePath $ZipPath
+        if ($ActualHash -ne $ExpectedToolsHash) {
+            throw "Android command-line tools SHA-256 mismatch. Expected $ExpectedToolsHash, got $ActualHash. Archive rejected."
+        }
+
+        New-Item -ItemType Directory -Path $ExtractRoot -Force | Out-Null
+        Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractRoot -Force
+        $ExtractedTools = Join-Path $ExtractRoot 'cmdline-tools'
+        if (-not (Test-Path -LiteralPath (Join-Path $ExtractedTools 'bin\sdkmanager.bat') -PathType Leaf)) {
+            throw 'The official archive did not contain cmdline-tools\bin\sdkmanager.bat.'
+        }
+
+        $ToolsParent = Join-Path $SdkRoot 'cmdline-tools'
+        New-Item -ItemType Directory -Path $ToolsParent -Force | Out-Null
+        $InstallToolsDir = Join-Path $ToolsParent 'wemaps-bootstrap'
+        $Suffix = 1
+        while (Test-Path -LiteralPath $InstallToolsDir) {
+            $Suffix++
+            $InstallToolsDir = Join-Path $ToolsParent "wemaps-bootstrap-$Suffix"
+        }
+        Move-Item -LiteralPath $ExtractedTools -Destination $InstallToolsDir
+        $SdkManager = Join-Path $InstallToolsDir 'bin\sdkmanager.bat'
+    } finally {
+        if (Test-Path -LiteralPath $ZipPath) { Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $ExtractRoot) { Remove-Item -LiteralPath $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+} else {
+    Write-Host "Found SDK manager: $SdkManager"
+    Write-Host "SDK root: $SdkRoot"
+}
+
+Write-Host ''
+Write-Host "Wemaps requires Platform $RequiredPlatform and Build-Tools $RequiredBuildTools."
+Write-Host 'Any already installed SDK packages will be reused.'
+$Consent = Read-Host 'Install missing packages and accept the Android SDK license agreements? [Y/N]'
+if ($Consent -notmatch '^(?i)y(es)?$') {
+    throw 'Android SDK package installation was declined.'
+}
+
+$PreviousPreference = $ErrorActionPreference
+try {
+    # Native sdkmanager diagnostics can appear on stderr in Windows PowerShell 5.1.
+    $ErrorActionPreference = 'Continue'
+    Write-Host 'Accepting Android SDK licenses...'
+    $LicenseAnswers = 1..100 | ForEach-Object { 'y' }
+    $LicenseAnswers | & $SdkManager "--sdk_root=$SdkRoot" '--licenses' | Out-Host
+    $LicenseExitCode = $LASTEXITCODE
+    if ($LicenseExitCode -ne 0) {
+        throw "sdkmanager --licenses failed with exit code $LicenseExitCode."
+    }
+
+    Write-Host "Installing missing SDK packages: platforms;$RequiredPlatform and build-tools;$RequiredBuildTools"
+    & $SdkManager "--sdk_root=$SdkRoot" "platforms;$RequiredPlatform" "build-tools;$RequiredBuildTools" | Out-Host
+    $InstallExitCode = $LASTEXITCODE
+    if ($InstallExitCode -ne 0) {
+        throw "sdkmanager package installation failed with exit code $InstallExitCode."
+    }
+} finally {
+    $ErrorActionPreference = $PreviousPreference
+}
+
+if (-not (Test-SdkComplete -Root $SdkRoot)) {
+    throw "sdkmanager finished, but Platform $RequiredPlatform or Build-Tools $RequiredBuildTools are still missing under $SdkRoot."
+}
+
+Write-Host "Android SDK is ready: $SdkRoot"
+Write-SdkResult -Root $SdkRoot
+exit 0
