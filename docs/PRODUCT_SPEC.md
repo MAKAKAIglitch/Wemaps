@@ -11,30 +11,38 @@
 
 ## 2. Design system
 
-### Name
+### Stage 1 map palette — Waze-inspired dark
 
-**Violet Night**
+For the first visible map prototype, use a dark navy/blue-grey palette inspired by the night-map appearance of Waze. This is a visual reference, not a claim to reproduce Waze's unpublished internal color tokens or use its proprietary assets.
 
-### Color tokens
-
-| Token | Hex | Intended use |
+| Token | Initial value | Intended use |
 | --- | --- | --- |
-| map.background | #100D18 | Deep map background |
-| map.urban | #191424 | Built-up land |
-| road.minor | #655B7A | Minor roads |
-| road.local | #80709F | Local streets |
-| road.secondary | #A18BC9 | Secondary roads |
-| road.primary | #B99CEB | Primary roads |
-| road.major | #D1B7FF | Major roads |
-| building.side | #29213B | Building side faces |
-| building.roof | #3A2E50 | Building roofs |
-| route.outline | #7139BA | Route casing |
-| route.main | #D18AFF | Route line |
-| route.highlight | #F4DEFF | Route highlight |
-| text.primary | #F0EAF8 | Primary text |
-| text.secondary | #B9A8D7 | Secondary text |
+| map.background | #182330 | Deep night-map background |
+| map.land | #202D3C | General land |
+| map.urban | #263649 | Built-up areas |
+| map.water | #10283D | Water |
+| road.minor | #35495E | Minor roads |
+| road.local | #455D75 | Local streets |
+| road.secondary | #58738D | Secondary roads |
+| road.primary | #718DA8 | Primary roads |
+| road.major | #91A9C0 | Major roads |
+| road.casing | #172433 | Road outline/separation |
+| building.side | #26374A | Building side faces |
+| building.roof | #354B61 | Building roofs |
+| route.outline | #54227C | Route casing |
+| route.main | #B65CE8 | Route line |
+| route.highlight | #E5B8FF | Route highlight |
+| lane.selected | #F4F7FC | Route-compatible lane |
+| lane.other | #8795A5 | Other lanes |
+| lane.arrow | #F4F7FC | Lane direction arrows |
+| text.primary | #E8F0F7 | Primary labels |
+| text.secondary | #AFC1D0 | Secondary labels |
 
-The palette is a starting token set, not a final accessibility certification. Contrast and legibility must be tested on real devices and in bright daylight.
+These are editable starting values chosen to approximate a Waze-like dark visual direction. They are not extracted official Waze constants. Every color must live in a central style-token configuration, not be hard-coded across map layers or UI code.
+
+Keep the previous Violet Night palette as a separately named, switchable preset for future use. The style architecture must support named presets and custom token overrides. A later map-appearance editor should let users change road, background, route, building, and lane colors without changing rendering logic.
+
+The palette is not an accessibility certification. Test contrast, color vision accessibility, and legibility on real devices in daylight and at night.
 
 ### UI framework
 
@@ -97,7 +105,24 @@ Use MapLibre Native Android for GPU-accelerated vector map rendering.
 
 ### Road hierarchy
 
-Road class must be communicated through a combination of line width, contrast, casing, and color. The route should be visually dominant without hiding intersections or road geometry.
+Road class must be communicated through line width, contrast, casing, and color. The route should be visually prominent without hiding intersections or road geometry. Road width must continue to follow mapped physical width where available; palette and road-class styling must not falsify dimensions.
+
+### Detailed lanes inspired by Yandex Navigator
+
+At useful close zoom levels, show a detailed lane layout on roads where the source attributes and geometry are sufficient.
+
+- Render separate lane surfaces or lane separators, not only a single centreline for the whole road.
+- Use lane counts and directional counts to determine the lane layout.
+- Use `turn:lanes=*` to draw per-lane direction arrows when valid.
+- Respect `oneway=*`, divided carriageways, and the road's actual direction.
+- Distinguish route-compatible lanes from other lanes when an active route is available: compatible lanes are bright/white; other lanes are muted grey. This follows the interaction pattern documented by Yandex Navigator, without copying its artwork or assets.
+- Show bus, tram, and bicycle lanes with distinct restrained symbols or markings when the relevant source data is available.
+- Use mapped lane widths and physical road width when available. If lane geometry is derived from a road centreline, mark it internally as generated geometry and do not present it as surveyed lane geometry.
+- Do not invent lane arrows or painted lines when the lane structure is unknown.
+- For complex junctions, ramps, and merges, lane geometry must follow the correct carriageway and direction, and must not jump across nearby parallel roads.
+- Fade or simplify detailed lane rendering at small zoom levels; reveal it progressively as the user zooms in.
+
+The provider must expose the lane tags required by the renderer. Some regions may have incomplete lane data; in those places, retain a clear road surface rather than fabricating detailed lane layouts.
 
 ## 4A. Road appearance, width, and lane markings
 
