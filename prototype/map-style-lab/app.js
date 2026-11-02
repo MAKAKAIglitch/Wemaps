@@ -1,10 +1,12 @@
 (() => {
   "use strict";
 
-  const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+  const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
   const CENTER = [13.405, 52.52];
   const DEFAULT_PITCH = 73;
   const AUTO_2D_WIDTH_KM = 5;
+  const CAMERA_TRANSITION_MS = 1320;
+  const BUILDING_FADE_MS = 1080;
   const STORAGE_KEY = "wemaps.violet-night.style-lab.v2";
   const LEGACY_STORAGE_KEY = "wemaps.violet-night.style-lab.v1";
   const EASE_IN_OUT_CUBIC = (t) => t < 0.5
@@ -82,6 +84,11 @@
   let styleReady = false;
   let styleUpdateTimer = null;
   let layerCache = null;
+  let currentExtrusionOpacity = buildingOpacity;
+  let extrusionFadeFrame = null;
+  let extrusionFadeToken = 0;
+  let styleLoadRetries = 0;
+  let retryTimer = null;
 
   function setStatus(text) {
     statusNode.textContent = text;
@@ -191,14 +198,103 @@
     return metersPerPixel * widthPx / 1000;
   }
 
-  function syncBuildingVisibility(flatView) {
+  function setExtrusionOpacity(opacity) {
+    currentExtrusionOpacity = Math.min(1, Math.max(0, opacity));
     findExtrusionLayers().forEach((layer) => {
-      map.setLayoutProperty(
-        layer.id,
-        "visibility",
-        buildingsVisible && !flatView ? "visible" : "none"
-      );
+      map.setPaintProperty(layer.id, "fill-extrusion-opacity", currentExtrusionOpacity);
     });
+  }
+
+  function animateExtrusionOpacity(targetOpacity, duration, hideAtZero = false) {
+    if (!map) return;
+
+    if (extrusionFadeFrame !== null) {
+      cancelAnimationFrame(extrusionFadeFrame);
+      extrusionFadeFrame = null;
+    }
+
+    const token = ++extrusionFadeToken;
+    const startOpacity = currentExtrusionOpacity;
+    const endOpacity = Math.min(1, Math.max(0, targetOpacity));
+    const startedAt = performance.now();
+
+    const finish = () => {
+      setExtrusionOpacity(endOpacity);
+      extrusionFadeFrame = null;
+      if (hideAtZero && endOpacity <= 0.001) {
+        findExtrusionLayers().forEach((layer) => {
+          map.setLayoutProperty(layer.id, "visibility", "none");
+        });
+      }
+    };
+
+    if (Math.abs(startOpacity - endOpacity) < 0.002 || duration <= 0) {
+      finish();
+      return;
+    }
+
+    const tick = (now) => {
+      if (token !== extrusionFadeToken) return;
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = EASE_IN_OUT_CUBIC(progress);
+      setExtrusionOpacity(startOpacity + (endOpacity - startOpacity) * eased);
+      if (progress < 1) {
+        extrusionFadeFrame = requestAnimationFrame(tick);
+      } else {
+        finish();
+      }
+    };
+
+    extrusionFadeFrame = requestAnimationFrame(tick);
+  }
+
+  function syncBuildingVisibility(flatView, animate = false) {
+    const shouldShow = buildingsVisible && !flatView;
+    findExtrusionLayers().forEach((layer) => {
+      map.setLayoutProperty(layer.id, "visibility", shouldShow ? "visible" : "none");
+    });
+
+    if (shouldShow) {
+      if (animate) animateExtrusionOpacity(buildingOpacity, BUILDING_FADE_MS);
+      else setExtrusionOpacity(buildingOpacity);
+    } else if (!animate) {
+      if (extrusionFadeFrame !== null) {
+        cancelAnimationFrame(extrusionFadeFrame);
+        extrusionFadeFrame = null;
+        extrusionFadeToken++;
+      }
+      setExtrusionOpacity(0);
+    }
+  }
+
+  function transitionCamera(targetPitch, targetZoom = map.getZoom(), extra = {}) {
+    if (!map) return;
+
+    const was3D = map.getPitch() >= 1;
+    const willBe3D = targetPitch >= 1;
+    const options = Object.assign({}, extra, {
+      pitch: targetPitch,
+      zoom: targetZoom,
+      duration: CAMERA_TRANSITION_MS,
+      easing: EASE_IN_OUT_CUBIC,
+      essential: true
+    });
+
+    if (buildingsVisible && willBe3D) {
+      findExtrusionLayers().forEach((layer) => {
+        map.setLayoutProperty(layer.id, "visibility", "visible");
+      });
+      animateExtrusionOpacity(buildingOpacity, BUILDING_FADE_MS);
+    } else if (buildingsVisible && was3D && !willBe3D) {
+      findExtrusionLayers().forEach((layer) => {
+        map.setLayoutProperty(layer.id, "visibility", "visible");
+      });
+      animateExtrusionOpacity(0, BUILDING_FADE_MS, true);
+    } else {
+      syncBuildingVisibility(!willBe3D, false);
+    }
+
+    map.easeTo(options);
   }
 
   function refreshAdaptiveCamera(animate = false, zoomOverride = null) {
@@ -211,13 +307,13 @@
     const pitchChanged = Math.abs(map.getPitch() - effectivePitch) > 0.5;
 
     if (pitchChanged) {
-      const cameraOptions = {
-        pitch: effectivePitch,
-        duration: animate ? 420 : 0,
-        easing: EASE_IN_OUT_CUBIC
-      };
-      if (animate) map.easeTo(cameraOptions);
-      else map.setPitch(effectivePitch);
+      if (animate) transitionCamera(effectivePitch, zoom);
+      else {
+        map.setPitch(effectivePitch);
+        syncBuildingVisibility(effectivePitch < 1, false);
+      }
+    } else if (extrusionFadeFrame === null) {
+      syncBuildingVisibility(effectivePitch < 1, false);
     }
 
     const flatView = automatic2D || effectivePitch < 1;
@@ -232,8 +328,6 @@
     $("#view3d").title = automatic2D
       ? "Приблизь карту до охвата 5 км, чтобы включить 3D"
       : "Переключить на 3D";
-
-    syncBuildingVisibility(flatView);
 
     if (styleReady) {
       const mode = automatic2D
@@ -678,6 +772,48 @@
       }, symbolBefore);
     }
 
+    const laneCountExpression = [
+      "case",
+      ["has", "lanes"],
+      ["to-number", ["get", "lanes"], 0],
+      ["any", ["has", "lanes:forward"], ["has", "lanes:backward"]],
+      [
+        "+",
+        ["to-number", ["get", "lanes:forward"], 0],
+        ["to-number", ["get", "lanes:backward"], 0]
+      ],
+      ["match", ["get", "class"],
+        "motorway", 4,
+        "trunk", 2,
+        "primary", 2,
+        "secondary", 2,
+        "tertiary", 2,
+        0
+      ]
+    ];
+    const laneRoadFilter = [
+      "all",
+      ["in", ["get", "class"], ["literal", [
+        "motorway", "trunk", "primary", "secondary", "tertiary", "minor"
+      ]]],
+      [">=", laneCountExpression, 2],
+      ["!=", ["get", "brunnel"], "tunnel"]
+    ];
+    const multilaneRoadFilter = [
+      "all",
+      ["in", ["get", "class"], ["literal", [
+        "motorway", "trunk", "primary", "secondary"
+      ]]],
+      [">=", laneCountExpression, 3],
+      ["!=", ["get", "brunnel"], "tunnel"]
+    ];
+    const laneLineWidth = [
+      "interpolate", ["linear"], ["zoom"],
+      14.5, 0.55,
+      16, 0.82,
+      18, 1.15
+    ];
+
     if (!map.getLayer("wemaps-road-lane-markings")) {
       map.addLayer({
         id: "wemaps-road-lane-markings",
@@ -685,26 +821,51 @@
         source: road.source,
         "source-layer": road.sourceLayer,
         minzoom: 14.5,
-        filter: ["all", ["in", ["get", "class"], ["literal", [
-          "motorway", "trunk", "primary", "secondary"
-        ]]], ["!=", ["get", "brunnel"], "tunnel"]],
+        filter: laneRoadFilter,
         layout: {
-          "line-cap": "round",
+          "line-cap": "butt",
           "line-join": "round"
         },
         paint: {
-          "line-color": "#f0ddff",
-          "line-width": [
-            "interpolate", ["linear"], ["zoom"],
-            14.5, 0.65,
-            18, 1.05
-          ],
-          "line-opacity": 0.58,
-          "line-dasharray": ["literal", [2, 3]],
-          "line-blur": 0.1
+          "line-color": "#f4e9ff",
+          "line-width": laneLineWidth,
+          "line-opacity": 0.82,
+          "line-dasharray": ["literal", [3, 3]],
+          "line-blur": 0.05
         }
       }, symbolBefore);
     }
+
+    [-1, 1].forEach((side) => {
+      const id = side < 0
+        ? "wemaps-road-lane-divider-left"
+        : "wemaps-road-lane-divider-right";
+      if (map.getLayer(id)) return;
+      map.addLayer({
+        id,
+        type: "line",
+        source: road.source,
+        "source-layer": road.sourceLayer,
+        minzoom: 15.5,
+        filter: multilaneRoadFilter,
+        layout: {
+          "line-cap": "butt",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": "#eadcff",
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            15.5, 0.55,
+            18, 0.95
+          ],
+          "line-offset": ["*", roadWidthExpression(0.22, 0), side],
+          "line-opacity": 0.58,
+          "line-dasharray": ["literal", [2.5, 3.5]],
+          "line-blur": 0.08
+        }
+      }, symbolBefore);
+    });
   }
 
   function applyStyle() {
@@ -840,14 +1001,11 @@
     const automatic2D = getVisibleWidthKm(zoom) > AUTO_2D_WIDTH_KM;
     const targetPitch = automatic2D ? 0 : preferredPitch;
 
-    const cameraOptions = { pitch: targetPitch, zoom };
     if (animate) {
-      map.easeTo(Object.assign(cameraOptions, {
-        duration: 520,
-        easing: EASE_IN_OUT_CUBIC
-      }));
+      transitionCamera(targetPitch, zoom);
     } else {
-      map.jumpTo(cameraOptions);
+      map.jumpTo({ pitch: targetPitch, zoom });
+      syncBuildingVisibility(targetPitch < 1, false);
     }
 
     $("#pitchValue").textContent = automatic2D
@@ -855,7 +1013,6 @@
       : String(Math.round(targetPitch)) + "°";
     $("#view2d").classList.toggle("selected", targetPitch < 1);
     $("#view3d").classList.toggle("selected", targetPitch >= 1);
-    syncBuildingVisibility(targetPitch < 1);
     saveSettings();
   }
 
@@ -903,16 +1060,6 @@
           throw new Error("Файл не похож на MapLibre Style JSON версии 8.");
         }
         map.setStyle(style);
-        map.once("style.load", () => {
-          layerCache = null;
-          registerVegetationPatterns();
-          ensureBuildingLayer();
-          ensureForestDetailLayers();
-          ensureRoadDepthLayers();
-          refreshLayerCache();
-          applyStyle();
-          setStatus("Импортированный стиль загружен");
-        });
       } catch (error) {
         showError("Не удалось импортировать стиль: " + error.message);
       }
@@ -1051,15 +1198,22 @@
     }), "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
 
-    map.once("load", () => {
+    map.on("style.load", () => {
       errorNode.hidden = true;
       styleReady = true;
+      styleLoadRetries = 0;
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+        retryTimer = null;
+      }
 
+      layerCache = null;
       registerVegetationPatterns();
       ensureBuildingLayer();
       ensureForestDetailLayers();
       ensureRoadDepthLayers();
       refreshLayerCache();
+      currentExtrusionOpacity = buildingOpacity;
       applyStyle();
       refreshAdaptiveCamera(false);
       updateBuildingControls();
@@ -1085,10 +1239,30 @@
         : "Неизвестная ошибка загрузки карты";
       console.warn("MapLibre error:", message);
 
-      if (!map.loaded()) {
+      if (!styleReady) {
+        if (styleLoadRetries < 3 && retryTimer === null) {
+          styleLoadRetries += 1;
+          const attempt = styleLoadRetries;
+          setStatus("Повторная загрузка карты · " + attempt + "/3");
+          retryTimer = window.setTimeout(() => {
+            retryTimer = null;
+            if (!styleReady && map) {
+              try {
+                map.setStyle(STYLE_URL, { diff: false });
+              } catch (retryError) {
+                console.warn("Map style retry failed:", retryError);
+              }
+            }
+          }, 700 * attempt);
+          return;
+        }
+
+        const isTruncated = /Content-Length header of network response exceeds response Body/i.test(message);
         showError(
-          "Не удалось загрузить карту. Проверь интернет-соединение. " +
-          "Источник данных: OpenFreeMap. Подробности: " + message
+          (isTruncated
+            ? "Сервер или промежуточный сетевой узел оборвал ответ карты (получено меньше данных, чем указано в Content-Length). Автоматические повторы не помогли. " 
+            : "Не удалось получить стиль карты после нескольких попыток. ") +
+          "Проверь соединение и повтори загрузку страницы. Источник данных: OpenFreeMap. Подробности: " + message
         );
       }
     });
