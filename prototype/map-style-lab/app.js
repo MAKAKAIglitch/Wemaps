@@ -23,6 +23,10 @@
   let buildingsVisible = true;
   let buildingOpacity = 0.92;
   let buildingHeightScale = 1;
+  let preferredPitch = Number($("#pitch").value);
+  let styleReady = false;
+  let styleUpdateTimer = null;
+  const AUTO_2D_WIDTH_KM = 5;
 
   function setStatus(text) { statusNode.textContent = text; }
   function showError(message) {
@@ -74,7 +78,8 @@
         buildingHeightScale = Math.min(1.8,Math.max(.6,saved.buildingHeightScale));
         $("#buildingHeight").value = Math.round(buildingHeightScale*100);
       }
-      if (Number.isFinite(saved.pitch)) $("#pitch").value = Math.min(75,Math.max(35,saved.pitch));
+      if (Number.isFinite(saved.pitch)) $("#pitch").value = Math.min(75,Math.max(0,saved.pitch));
+      preferredPitch = Number($("#pitch").value);
       if (Number.isFinite(saved.zoom)) $("#zoom").value = Math.min(19,Math.max(5,saved.zoom));
     } catch (error) { console.warn("Saved settings could not be read:",error); }
   }
@@ -95,6 +100,65 @@
   function findExtrusionLayers() {
     if (!map) return [];
     return map.getStyle().layers.filter((layer) => layer.type === "fill-extrusion");
+  }
+
+  function getVisibleWidthKm(zoom = map.getZoom()) {
+    const widthPx = map.getCanvas().clientWidth;
+    const latitude = map.getCenter().lat * Math.PI / 180;
+    const worldWidthMeters = 40075016.68557849 * Math.cos(latitude);
+    const metersPerPixel = worldWidthMeters / (512 * Math.pow(2, zoom));
+    return metersPerPixel * widthPx / 1000;
+  }
+
+  function syncBuildingVisibility(flatView) {
+    findExtrusionLayers().forEach((layer) => {
+      map.setLayoutProperty(layer.id, "visibility",
+        buildingsVisible && !flatView ? "visible" : "none");
+    });
+  }
+
+  function refreshAdaptiveCamera(animate = false, zoomOverride = null) {
+    if (!map) return;
+    const zoom = zoomOverride === null ? map.getZoom() : zoomOverride;
+    const visibleWidthKm = getVisibleWidthKm(zoom);
+    const automatic2D = visibleWidthKm > AUTO_2D_WIDTH_KM;
+    const effectivePitch = automatic2D ? 0 : preferredPitch;
+    const pitchChanged = Math.abs(map.getPitch() - effectivePitch) > 0.5;
+
+    if (pitchChanged) {
+      if (animate) map.easeTo({ pitch: effectivePitch, duration: 180 });
+      else map.setPitch(effectivePitch);
+    }
+
+    const flatView = automatic2D || effectivePitch < 1;
+    $("#pitchValue").textContent = automatic2D
+      ? "0° · авто"
+      : String(Math.round(effectivePitch)) + "°";
+    $("#view2d").classList.toggle("selected", flatView);
+    $("#view3d").classList.toggle("selected", !flatView);
+    $("#view2d").title = automatic2D
+      ? "Автоматически включено: обзор больше 5 км"
+      : "Переключить на 2D";
+    $("#view3d").title = automatic2D
+      ? "Приблизь карту до охвата 5 км, чтобы включить 3D"
+      : "Переключить на 3D";
+
+    syncBuildingVisibility(flatView);
+
+    if (styleReady) {
+      const mode = automatic2D
+        ? "2D · обзор " + visibleWidthKm.toFixed(1) + " км"
+        : (flatView ? "2D · ручной режим" : "3D · обзор " + visibleWidthKm.toFixed(1) + " км");
+      setStatus("Стиль готов · " + mode);
+    }
+  }
+
+  function scheduleStyleUpdate() {
+    if (styleUpdateTimer !== null) window.clearTimeout(styleUpdateTimer);
+    styleUpdateTimer = window.setTimeout(() => {
+      styleUpdateTimer = null;
+      applyStyle();
+    }, 70);
   }
   function ensureBuildingLayer() {
     if (!map || findExtrusionLayers().length) return;
@@ -187,21 +251,25 @@
       }
     });
     if (buildingsVisible) ensureBuildingLayer();
-    findExtrusionLayers().forEach((layer) => {
-      map.setLayoutProperty(layer.id,"visibility",buildingsVisible ? "visible" : "none");
-    });
-    setStatus("Карта загружена · стиль применён");
+    const isWideView = getVisibleWidthKm() > AUTO_2D_WIDTH_KM;
+    syncBuildingVisibility(isWideView || map.getPitch() < 1);
+    refreshAdaptiveCamera(false);
   }
   function updateCamera() {
     if (!map) return;
-    const pitch = Number($("#pitch").value);
+    preferredPitch = Number($("#pitch").value);
     const zoom = Number($("#zoom").value);
-    $("#pitchValue").textContent = String(pitch) + "°";
     $("#zoomValue").textContent = zoom.toFixed(1);
-    map.easeTo({pitch:pitch,zoom:zoom,duration:250});
+    const targetPitch = getVisibleWidthKm(zoom) > AUTO_2D_WIDTH_KM ? 0 : preferredPitch;
+    map.easeTo({ pitch: targetPitch, zoom: zoom, duration: 220 });
+    refreshAdaptiveCamera(false, zoom);
     saveSettings();
-    $("#view2d").classList.toggle("selected",pitch < 10);
-    $("#view3d").classList.toggle("selected",pitch >= 10);
+  }
+
+  function choosePitch(pitch) {
+    preferredPitch = pitch;
+    $("#pitch").value = String(pitch);
+    updateCamera();
   }
   function updateBuildingControls() {
     $("#buildingOpacityValue").textContent = String(Math.round(buildingOpacity*100)) + "%";
@@ -249,13 +317,13 @@
   function bindControls() {
     colorInputs.forEach((input) => input.addEventListener("input",() => {
       updateColorLabels();
-      applyStyle();
+      scheduleStyleUpdate();
       saveSettings();
       document.querySelectorAll(".preset").forEach((button) => button.classList.remove("active"));
     }));
     $("#buildingOpacity").addEventListener("input",(event) => {
       buildingOpacity = Number(event.target.value)/100;
-      updateBuildingControls(); applyStyle(); saveSettings();
+      updateBuildingControls(); scheduleStyleUpdate(); saveSettings();
     });
     $("#buildingHeight").addEventListener("input",(event) => {
       buildingHeightScale = Number(event.target.value)/100;
@@ -272,7 +340,7 @@
       document.querySelectorAll(".preset").forEach((item) => item.classList.toggle("active",item.dataset.preset === "violet"));
     });
     $("#resetCamera").addEventListener("click",() => {
-      $("#pitch").value = 58; $("#zoom").value = 15.2; updateCamera();
+      $("#zoom").value = 15.2; choosePitch(58);
       map.easeTo({center:CENTER,bearing:-18,duration:500});
     });
     $("#toggleBuildings").addEventListener("click",() => {
@@ -280,9 +348,12 @@
       $("#toggleBuildings").textContent = "3D: " + (buildingsVisible ? "включено" : "выключено");
       applyStyle();
     });
-    $("#view2d").addEventListener("click",() => { $("#pitch").value = 0; updateCamera(); });
-    $("#view3d").addEventListener("click",() => { $("#pitch").value = 58; updateCamera(); });
-    $("#recenter").addEventListener("click",() => map.easeTo({center:CENTER,zoom:15.2,pitch:Number($("#pitch").value),bearing:-18,duration:550}));
+    $("#view2d").addEventListener("click",() => choosePitch(0));
+    $("#view3d").addEventListener("click",() => choosePitch(58));
+    $("#recenter").addEventListener("click",() => {
+      const targetPitch = getVisibleWidthKm(15.2) > AUTO_2D_WIDTH_KM ? 0 : preferredPitch;
+      map.easeTo({center:CENTER,zoom:15.2,pitch:targetPitch,bearing:-18,duration:550});
+    });
     $("#exportStyle").addEventListener("click",downloadJson);
     $("#importStyle").addEventListener("click",() => $("#styleFile").click());
     $("#styleFile").addEventListener("change",(event) => {
@@ -298,19 +369,32 @@
     }
     map = new maplibregl.Map({
       container:"map",style:STYLE_URL,center:CENTER,zoom:Number($("#zoom").value),
-      pitch:Number($("#pitch").value),bearing:-18,maxPitch:80,minZoom:3,maxZoom:20,
+      pitch:0,bearing:-18,maxPitch:80,minZoom:3,maxZoom:20,
       attributionControl:true,renderWorldCopies:false,
-      canvasContextAttributes:{antialias:true}
+      fadeDuration:0,
+      maxTileCacheZoomLevels:3,
+      cancelPendingTileRequestsWhileZooming:true,
+      localIdeographFontFamily:"sans-serif",
+      canvasContextAttributes:{antialias:false,powerPreference:"high-performance"}
     });
     map.addControl(new maplibregl.NavigationControl({showCompass:true,showZoom:true,visualizePitch:true}),"top-right");
     map.addControl(new maplibregl.ScaleControl({unit:"metric"}),"bottom-right");
     map.once("load",() => {
       errorNode.hidden = true;
+      styleReady = true;
       ensureBuildingLayer();
       applyStyle();
-      updateCamera();
+      refreshAdaptiveCamera(false);
       updateBuildingControls();
     });
+    map.on("zoomend",() => {
+      const actualZoom = map.getZoom();
+      $("#zoom").value = String(Math.min(19,Math.max(5,actualZoom)));
+      $("#zoomValue").textContent = actualZoom.toFixed(1);
+      refreshAdaptiveCamera(true);
+      saveSettings();
+    });
+    map.on("resize",() => refreshAdaptiveCamera(false));
     map.on("error",(event) => {
       const message = event && event.error && event.error.message ? event.error.message : "Неизвестная ошибка загрузки карты";
       console.warn("MapLibre error:",message);
