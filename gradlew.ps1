@@ -155,8 +155,18 @@ if ($env:USERPROFILE) {
 $SelectedJava = $null
 foreach ($Candidate in $JavaCandidates) {
     $JavaExe = Join-Path $Candidate.Home "bin\java.exe"
-    $VersionOutput = (& $JavaExe -version 2>&1 | Out-String)
     Write-Host "Checking JDK candidate: $($Candidate.Home) ($($Candidate.Source))"
+
+    # Java writes its version banner to stderr. PowerShell 7 can turn native
+    # stderr into a terminating error when ErrorActionPreference is Stop.
+    $PreviousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $VersionOutput = (& $JavaExe -version 2>&1 | Out-String)
+    }
+    finally {
+        $ErrorActionPreference = $PreviousErrorActionPreference
+    }
 
     # The standard version banner is consistent across OpenJDK distributions.
     $VersionMatch = [regex]::Match($VersionOutput, 'version\s+"([^"]+)"')
