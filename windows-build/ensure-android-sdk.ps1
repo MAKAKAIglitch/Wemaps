@@ -91,6 +91,47 @@ function Write-SdkResult {
     )
 }
 
+function Test-SdkInstallWritable {
+    param([string]$Root)
+
+    try {
+        $Root = [IO.Path]::GetFullPath($Root)
+        [IO.Directory]::CreateDirectory($Root) | Out-Null
+
+        $Directories = @(
+            $Root,
+            (Join-Path $Root 'platforms'),
+            (Join-Path $Root "platforms\$RequiredPlatform"),
+            (Join-Path $Root 'build-tools'),
+            (Join-Path $Root "build-tools\$RequiredBuildTools")
+        )
+
+        foreach ($Directory in $Directories) {
+            if (-not (Test-Path -LiteralPath $Directory -PathType Container)) { continue }
+
+            $ProbePath = Join-Path $Directory ('.wemaps-write-test-' + [guid]::NewGuid().ToString('N'))
+            $Stream = $null
+            try {
+                $Stream = [IO.File]::Open(
+                    $ProbePath,
+                    [IO.FileMode]::CreateNew,
+                    [IO.FileAccess]::Write,
+                    [IO.FileShare]::None
+                )
+            } finally {
+                if ($null -ne $Stream) { $Stream.Dispose() }
+                if (Test-Path -LiteralPath $ProbePath -PathType Leaf) {
+                    Remove-Item -LiteralPath $ProbePath -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 function Get-FileSha256 {
     param([string]$FilePath)
 
@@ -110,6 +151,7 @@ Write-Host 'Wemaps: searching for the Android SDK already installed on this comp
 # Explicit Android SDK environment variables have the highest priority.
 Add-SdkRoot -Path $env:ANDROID_SDK_ROOT
 Add-SdkRoot -Path $env:ANDROID_HOME
+Add-SdkRoot -Path (Join-Path $env:LOCALAPPDATA 'Wemaps\AndroidSdk')
 
 # Read the current project's local.properties.
 $ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -315,6 +357,23 @@ if (-not $SdkRoot) {
     Write-Host "SDK root: $SdkRoot"
 }
 
+# Normalize the selected SDK root and verify that sdkmanager can write into the
+# SDK and its existing package directories. Keep a protected/shared SDK intact
+# by falling back to a user-local Wemaps SDK when those directories are read-only.
+$SdkRoot = [IO.Path]::GetFullPath($SdkRoot)
+$ManagedSdkRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Wemaps\AndroidSdk'))
+if (-not (Test-SdkInstallWritable -Root $SdkRoot)) {
+    Write-Host ''
+    Write-Host "The existing SDK folder is not writable: $SdkRoot"
+    Write-Host 'The existing SDK will be left unchanged. Wemaps will install its required components into a user-local SDK.'
+    if (-not (Test-SdkInstallWritable -Root $ManagedSdkRoot)) {
+        throw "Neither the existing SDK nor the user-local SDK folder is writable. Check permissions for: $ManagedSdkRoot"
+    }
+    $SdkRoot = $ManagedSdkRoot
+    Add-SdkRoot -Path $SdkRoot
+    Write-Host "Using user-local Android SDK: $SdkRoot"
+}
+
 Write-Host ''
 Write-Host "Wemaps requires Platform $RequiredPlatform and Build-Tools $RequiredBuildTools."
 Write-Host 'Any already installed SDK packages will be reused.'
@@ -336,8 +395,44 @@ try {
     }
 
     Write-Host "Installing missing SDK packages: platforms;$RequiredPlatform and build-tools;$RequiredBuildTools"
-    & $SdkManager "--sdk_root=$SdkRoot" "platforms;$RequiredPlatform" "build-tools;$RequiredBuildTools" | Out-Host
+    $InstallMessages = @()
+    & $SdkManager "--sdk_root=$SdkRoot" "platforms;$RequiredPlatform" "build-tools;$RequiredBuildTools" 2>&1 |
+        Tee-Object -Variable InstallMessages | Out-Host
     $InstallExitCode = $LASTEXITCODE
+
+    # Some SDK folders pass a basic existence check but still reject package
+    # installation. Retry this specific permissions/metadata failure in a
+    # private, user-writable SDK instead of requiring an administrator shell.
+    $InstallText = $InstallMessages -join [Environment]::NewLine
+    if ($InstallExitCode -ne 0 -and
+        $InstallText -match '(?i)Failed to read or create install properties file' -and
+        $SdkRoot -ne $ManagedSdkRoot) {
+
+        Write-Host ''
+        Write-Host 'sdkmanager could not create its install properties in the selected SDK.'
+        Write-Host "Retrying in the user-local SDK: $ManagedSdkRoot"
+        if (-not (Test-SdkInstallWritable -Root $ManagedSdkRoot)) {
+            throw "The user-local Android SDK folder is not writable: $ManagedSdkRoot"
+        }
+
+        $SdkRoot = $ManagedSdkRoot
+        Add-SdkRoot -Path $SdkRoot
+
+        Write-Host 'Accepting Android SDK licenses for the user-local SDK...'
+        $LicenseAnswers = 1..100 | ForEach-Object { 'y' }
+        $LicenseAnswers | & $SdkManager "--sdk_root=$SdkRoot" '--licenses' | Out-Host
+        $LicenseExitCode = $LASTEXITCODE
+        if ($LicenseExitCode -ne 0) {
+            throw "sdkmanager --licenses failed in the user-local SDK with exit code $LicenseExitCode."
+        }
+
+        Write-Host "Retrying SDK package installation in: $SdkRoot"
+        $InstallMessages = @()
+        & $SdkManager "--sdk_root=$SdkRoot" "platforms;$RequiredPlatform" "build-tools;$RequiredBuildTools" 2>&1 |
+            Tee-Object -Variable InstallMessages | Out-Host
+        $InstallExitCode = $LASTEXITCODE
+    }
+
     if ($InstallExitCode -ne 0) {
         throw "sdkmanager package installation failed with exit code $InstallExitCode."
     }
