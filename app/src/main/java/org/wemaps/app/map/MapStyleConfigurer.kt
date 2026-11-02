@@ -1,7 +1,9 @@
 package org.wemaps.app.map
 
+import android.graphics.Color
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -15,6 +17,8 @@ object MapStyleConfigurer {
     }
 
     private fun applyBasePalette(style: Style, palette: MapPalette) {
+        setBackgroundColor(style, "background", palette.background)
+
         setLineColor(style, "highway_path", palette.roadMinor)
         setLineColor(style, "highway_minor", palette.roadLocal)
         setLineColor(style, "highway_major_casing", palette.roadCasing)
@@ -31,6 +35,11 @@ object MapStyleConfigurer {
         setFillColor(style, "landcover_wood", palette.park)
         setFillColor(style, "landuse_park", palette.park)
         setFillColor(style, "building", palette.buildingSide)
+    }
+
+    private fun setBackgroundColor(style: Style, layerId: String, color: String) {
+        val layer = style.getLayer(layerId) as? BackgroundLayer ?: return
+        layer.setProperties(PropertyFactory.backgroundColor(color))
     }
 
     private fun setLineColor(style: Style, layerId: String, color: String) {
@@ -57,7 +66,7 @@ object MapStyleConfigurer {
                 )
             )
             setProperties(
-                PropertyFactory.fillExtrusionColor(color),
+                PropertyFactory.fillExtrusionColor(Color.parseColor(color)),
                 PropertyFactory.fillExtrusionHeight(Expression.get("render_height")),
                 PropertyFactory.fillExtrusionBase(Expression.get("render_min_height")),
                 PropertyFactory.fillExtrusionOpacity(0.94f),
@@ -65,6 +74,7 @@ object MapStyleConfigurer {
             )
         }
 
+        // Put buildings above their 2D footprints but below labels.
         val firstSymbolLayer = style.getLayers().firstOrNull { it is SymbolLayer }
         if (firstSymbolLayer != null) {
             style.addLayerBelow(buildings, firstSymbolLayer.id)
