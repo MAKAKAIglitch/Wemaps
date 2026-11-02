@@ -8,6 +8,7 @@ This roadmap describes intended development order. It contains no delivery dates
 - [x] Define the Violet Night visual identity.
 - [x] Select the initial Android technology direction.
 - [x] Document the no-project-server approach for the first milestones.
+- [x] Add a local browser-based Violet Night style lab prototype.
 - [ ] Create the Android project and Gradle structure.
 - [ ] Add license headers / license information for source files where appropriate.
 - [ ] Add a basic build and CI check.
@@ -18,7 +19,7 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Integrate MapLibre Native Android.
 - [ ] Load a compatible third-party vector-map style.
 - [ ] Add required map attribution.
-- [ ] Implement the Violet Night map style.
+- [ ] Implement the Violet Night map style in the Android app, using the browser prototype as a design tool.
 - [ ] Open directly into the map.
 - [ ] Implement the compact bottom dock.
 - [ ] Add basic zoom, rotation, recenter, and compass controls.
