@@ -25,6 +25,7 @@ import org.wemaps.app.map.DeviceLocationMarker
 import org.wemaps.app.map.MapPalette
 import org.wemaps.app.map.MapStyleConfig
 import org.wemaps.app.map.MapStyleConfigurer
+import org.wemaps.app.map.MapStyleLayers
 import org.wemaps.app.map.OsmLaneMarkingsOverlay
 
 @Composable
@@ -32,7 +33,7 @@ fun MapLibreMapView(
     palette: MapPalette,
     location: DeviceLocation?,
     modifier: Modifier = Modifier,
-    onStyleReady: (map: MapLibreMap, buildingsAvailable: Boolean) -> Unit
+    onStyleReady: (map: MapLibreMap, layers: MapStyleLayers) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -125,7 +126,7 @@ fun MapLibreMapView(
             map.uiSettings.isScrollGesturesEnabled = true
 
             map.setStyle(Style.Builder().fromUri(MapStyleConfig.styleUrl)) { style ->
-                val buildingsAvailable = MapStyleConfigurer.apply(style, palette)
+                val layers = MapStyleConfigurer.apply(style, palette)
                 DeviceLocationMarker.install(style)
 
                 roadMarkingsOverlay?.close()
@@ -152,7 +153,7 @@ fun MapLibreMapView(
                     )
                 )
 
-                currentOnStyleReady(map, buildingsAvailable)
+                currentOnStyleReady(map, layers)
             }
         }
     }
