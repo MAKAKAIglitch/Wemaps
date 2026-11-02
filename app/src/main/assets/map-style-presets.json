@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "defaultPreset": "midnight-navigation",
+  "presets": {
+    "midnight-navigation": {
+      "label": "Midnight Navigation",
+      "description": "Original Wemaps dark navy and blue-grey cartographic palette.",
+      "colors": {
+        "map.background": "#182330",
+        "map.land": "#202D3C",
+        "map.urban": "#263649",
+        "map.water": "#10283D",
+        "map.park": "#20342D",
+        "road.casing": "#172433",
+        "road.minor": "#35495E",
+        "road.local": "#455D75",
+        "road.secondary": "#58738D",
+        "road.primary": "#718DA8",
+        "road.major": "#91A9C0",
+        "building.side": "#26374A",
+        "building.roof": "#354B61",
+        "route.outline": "#54227C",
+        "route.main": "#B65CE8",
+        "route.highlight": "#E5B8FF",
+        "lane.selected": "#F4F7FC",
+        "lane.other": "#8795A5",
+        "lane.arrow": "#F4F7FC",
+        "road.marking": "#DCE5EE",
+        "road.marking.muted": "#8999A9",
+        "text.primary": "#E8F0F7",
+        "text.secondary": "#AFC1D0"
+      }
+    },
+    "violet-night": {
+      "label": "Violet Night",
+      "description": "Alternative purple Wemaps map palette.",
+      "colors": {
+        "map.background": "#100D18",
+        "map.land": "#171321",
+        "map.urban": "#191424",
+        "map.water": "#142135",
+        "map.park": "#19291F",
+        "road.casing": "#100D18",
+        "road.minor": "#655B7A",
+        "road.local": "#80709F",
+        "road.secondary": "#A18BC9",
+        "road.primary": "#B99CEB",
+        "road.major": "#D1B7FF",
+        "building.side": "#29213B",
+        "building.roof": "#3A2E50",
+        "route.outline": "#7139BA",
+        "route.main": "#D18AFF",
+        "route.highlight": "#F4DEFF",
+        "lane.selected": "#F4F7FC",
+        "lane.other": "#8795A5",
+        "lane.arrow": "#F4F7FC",
+        "road.marking": "#F0EAF8",
+        "road.marking.muted": "#B9A8D7",
+        "text.primary": "#F0EAF8",
+        "text.secondary": "#B9A8D7"
+      }
+    }
+  },
+  "customOverrides": {
+    "description": "Optional user-defined semantic color overrides. Unknown token names are ignored safely.",
+    "colors": {}
+  }
+}
