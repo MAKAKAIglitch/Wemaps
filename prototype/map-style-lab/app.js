@@ -447,6 +447,8 @@
       "secondary", 8.2,
       "tertiary", 7.2,
       "minor", 6.4,
+      "street", 6.4,
+      "street_limited", 6.4,
       "service", 4.6,
       "track", 3.6,
       "path", 2.0,
@@ -758,7 +760,7 @@
   function roadFilter() {
     return ["in", ["get", "class"], ["literal", [
       "motorway", "trunk", "primary", "secondary", "tertiary",
-      "minor", "service", "track", "path", "pedestrian"
+      "street", "street_limited", "minor", "service", "track", "path", "pedestrian"
     ]]];
   }
 
@@ -970,7 +972,7 @@
     canvas.width = 64;
     canvas.height = 64;
     const ctx = canvas.getContext("2d");
-    if (kind === "camera") {
+    if (kind === "camera" || kind === "camera-direction") {
       ctx.shadowColor = "rgba(0,0,0,.65)";
       ctx.shadowBlur = 8;
       ctx.fillStyle = "#21142c";
