@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "org.wemaps.app"
-    compileSdk = 36
+    compileSdk = 37
+    compileSdkMinor = 1
 
     defaultConfig {
         applicationId = "org.wemaps.app"
