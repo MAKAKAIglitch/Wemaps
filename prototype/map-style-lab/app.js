@@ -1171,11 +1171,11 @@
     for (const [key, raw] of candidates) {
       if (!raw) continue;
       const value = String(raw).trim().toLowerCase().replace(",", ".");
-      const match = value.match(/(\\d+(?:\\.\\d+)?)/);
+      const match = value.match(/(\d+(?:\.\d+)?)/);
       if (!match) continue;
       let widthMeters = Number(match[1]);
       if (!Number.isFinite(widthMeters) || widthMeters <= 0 || widthMeters > 100) continue;
-      if (/\\b(ft|foot|feet)\\b|['′]/.test(value)) widthMeters *= 0.3048;
+      if (/\b(ft|foot|feet)\b|['′]/.test(value)) widthMeters *= 0.3048;
       return { widthMeters, widthTag: key };
     }
     return null;
