@@ -102,11 +102,9 @@ When physical width is missing:
 
 Keep three provenance states separate in the internal model: mapped width, estimated width, and renderer fallback. Never call the latter two an exact OSM measurement.
 
-## 6. Lane geometry and markings inspired by Yandex Navigator
+## 6. Route-aware lane geometry and markings
 
-The intended interaction pattern is detailed road lanes at close zoom and route-aware lane highlighting. Yandex Navigator documents a mode where lanes matching the route are shown in white, other lanes in grey, and each lane has an arrow indicating its direction. See [Yandex Navigator: Moving along a route](https://yandex.ru/support/navigator/ru/route-movement) and [Yandex Navigator: detailed road layouts](https://mobi.yandex.com/support/navigator/en/route-movement).
-
-Wemaps should implement its own rendering and data model; this is a design reference, not a request to copy Yandex assets or proprietary code.
+The intended interaction is detailed lane geometry at close zoom and route-aware lane highlighting. When lane matching is available, lanes compatible with the route should be highlighted in a bright tone, other lanes should be muted, and valid lane-turn values may be shown as per-lane arrows. Wemaps must implement its own rendering, algorithms, assets, and interaction design.
 
 ### Lane geometry inputs
 
@@ -157,11 +155,11 @@ OpenFreeMap remains a candidate for the base map prototype. Its use does not by 
 
 Map colors must be centralized in one configuration layer. Individual style layers must reference semantic tokens rather than hard-coded color literals.
 
-Stage 1 uses a Waze-inspired dark palette. The values are defined in `docs/PRODUCT_SPEC.md`. They are visual starting values, not official Waze constants.
+Stage 1 uses the original Midnight Navigation dark palette. The values are defined in `docs/PRODUCT_SPEC.md` and are Wemaps design tokens.
 
 The style system must support:
 - named presets;
-- a Waze-inspired dark default;
+- an original Midnight Navigation dark default;
 - a separately retained Violet Night preset;
 - custom color overrides;
 - persistence of the selected preset and overrides in local app settings.
