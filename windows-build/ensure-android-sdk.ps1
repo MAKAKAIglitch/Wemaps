@@ -206,27 +206,43 @@ foreach ($Root in $script:SdkRoots) {
     }
 }
 
-# If no SDK path was discovered, allow selecting the already-installed SDK folder.
-if ($script:SdkRoots.Count -eq 0) {
+# Keep only paths that actually look like Android SDK roots.
+$SdkCandidates = @($script:SdkRoots | Where-Object {
+    (Test-Path -LiteralPath (Join-Path $_ 'platforms') -PathType Container) -or
+    (Test-Path -LiteralPath (Join-Path $_ 'platform-tools') -PathType Container) -or
+    (Test-Path -LiteralPath (Join-Path $_ 'build-tools') -PathType Container) -or
+    (Test-Path -LiteralPath (Join-Path $_ 'cmdline-tools') -PathType Container) -or
+    (Test-Path -LiteralPath (Join-Path $_ 'tools\bin\sdkmanager.bat') -PathType Leaf)
+})
+
+# If no SDK path was discovered, or IDE settings only exposed unrelated folders,
+# let the user point to the SDK that Android Studio already uses.
+if ($SdkCandidates.Count -eq 0) {
     if ($env:CI -eq 'true') {
         throw 'Android SDK was not found in CI. Set ANDROID_HOME/ANDROID_SDK_ROOT or provide local.properties.'
     }
 
-    Write-Host 'Automatic search did not find the SDK. Select its existing root folder.'
+    Write-Host 'Automatic search did not find an Android SDK root. Select the existing SDK folder.'
     Add-Type -AssemblyName System.Windows.Forms
     $Dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $Dialog.Description = 'Select the existing Android SDK folder (the folder containing platforms and build-tools)'
+    $Dialog.Description = 'Select the existing Android SDK folder (the folder containing platforms, build-tools, or cmdline-tools)'
     $Dialog.ShowNewFolderButton = $false
     try {
         if ($Dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
             throw 'Android SDK folder selection was cancelled.'
         }
-        Add-SdkRoot -Path $Dialog.SelectedPath
+        $SdkCandidates = @($Dialog.SelectedPath)
     } finally {
         $Dialog.Dispose()
     }
 }
 
+# Keep candidates ordered, deduplicated, and limited to actual SDK roots.
+$script:SdkRoots.Clear()
+$script:SeenSdkRoots = @{}
+foreach ($Candidate in $SdkCandidates) {
+    Add-SdkRoot -Path $Candidate
+}
 if ($script:SdkRoots.Count -eq 0) {
     throw 'No existing Android SDK folder was selected or detected.'
 }
