@@ -4,7 +4,7 @@ A local browser-based playground for tuning the Wemaps map appearance before imp
 
 ## What it does
 
-- Loads the OpenFreeMap Dark vector style into MapLibre GL JS as a dark base before applying the Violet Night palette.
+- Loads the original OpenFreeMap Liberty vector style, then recolors its background, land, water, roads, buildings, and labels with the custom Violet Night palette. The provider style is the data/rendering base; Violet Night is the visual overlay.
 - Applies the Violet Night palette to the actual map layers.
 - Lets you adjust land, water, beach, woodland, road hierarchy, road thickness, building colors, 3D opacity, camera pitch, and zoom.
 - Updates the map as controls change.
@@ -41,7 +41,7 @@ The initial map center is a neutral sample view in central Berlin. Drag the map 
 
 Use the color pickers to adjust the Violet Night palette. The map is restyled live. The left settings panel scrolls independently on desktop.
 
-- Road hierarchy: each road class gets a separate color, while road casings use their own darker color.
+- Road hierarchy: each road class gets a separate color, while road casings use their own darker color. Road strokes are converted from tagged or estimated real-world widths in metres into screen pixels for the current zoom and latitude. Explicit width/lanes are used if a tile source exposes them; otherwise the renderer uses typical road-class and lane-width estimates.
 - 3D buildings: brighter extrusion color, footprint outline, and opacity. Extrusion uses the tile's mapped render_height / height values without artificial height exaggeration.
 - Camera: pitch and zoom sliders, plus quick 2D/3D buttons. The default 3D pitch is 73°. 2D/3D transitions use a longer eased camera animation; building extrusions fade in and out with the camera. When the visible map width exceeds 5 km, the prototype automatically transitions to a flat 2D view and restores the selected 3D pitch when zoomed in.
 - Presets: Violet Night, Deep Purple, and Neon Violet.
@@ -55,16 +55,17 @@ The exported style retains its underlying vector source, glyph, sprite, tile URL
 - The prototype uses a third-party style/data service. Initial loading speed still depends on the network, CDN, and tile provider. The map canvas remains dark while loading, and interrupted style/vector responses trigger up to two automatic reload attempts; persistent Content-Length/body mismatches still require a working network path. Camera easing, label fading, a deeper tile cache, progressive tile loading, and WebGL antialiasing are enabled to favor smoother movement. Extra detail layers are gated by zoom to avoid drawing them at distant scales. Availability, coverage, update frequency, and terms are controlled by that provider.
 - 3D building quality depends on the building data and height attributes available in each area.
 - The extrusion color is shared by roof and walls; MapLibre's vertical gradient shades the sides. The footprint outline is controlled separately. OpenMapTiles exposes render_height and render_min_height, which may be derived from explicit height or building levels; no arbitrary 9 m fallback or height multiplier is applied. Buildings without usable height data are not given an invented height.
-- Roads use class-based widths, optional lane-count widening when the source exposes lanes / lanes:forward / lanes:backward, layered casings, a soft offset shadow, a subtle top sheen, and zoom-gated lane dividers. The center divider appears on roads inferred to have at least two lanes; two additional offset dividers appear on roads inferred to have at least three lanes. When explicit lane tags are absent, the prototype estimates a schematic lane layout from road class. These guides are visual cartography, not surveyed lane geometry or a guarantee of the exact real-world lane count: the standard OpenMapTiles transportation schema does not expose the OSM lanes tag.
+- Road widths use physical metre-to-pixel scaling, with explicit width/lanes when supplied by the source and typical estimates by road class otherwise. Layered casings and shadows create depth. Lane dividers are rendered according to available lane counts; if the source does not expose lane data, a schematic layout is inferred from road class. The standard OpenMapTiles transportation schema documents class, ramp, and bridge/tunnel fields but not width or lanes, so the OpenFreeMap preview cannot claim surveyed road widths or exact lane geometry. Bridge segments receive a raised-deck/shadow treatment; ramp segments receive a separate highlight.
+- The prototype fetches OSM speed-camera and traffic-surveillance nodes plus motorway-junction nodes for the current visible map area through the public Overpass API. A marker shows a direction cone only when OSM includes a numeric or compass direction. Camera/road coverage depends on OSM mapping and Overpass availability; motorway ramps and bridges are styled from OpenMapTiles transportation attributes.
 - Woodland polygons receive tiny repeating tree-canopy symbols only at close zoom. If a richer tile source exposes leaf_type, conifer and broadleaf patterns can be selected separately. The standard OpenMapTiles landcover schema has class and subclass but does not guarantee species or individual tree points, so the generic pattern is not a claim about the exact trees in that forest.
 - Beach and sand subclasses receive a dark sand-gold color.
-- This prototype does not implement route calculation, GPS tracking, speed limits, camera alerts, search, or weather.
+- This prototype does not implement route calculation, GPS tracking, speed-limit alerts, search, or weather.
 - It does not download offline areas.
 
 ## Technology
 
 - MapLibre GL JS 6.16.0, pinned in the HTML.
-- OpenFreeMap Dark base style.
+- OpenFreeMap Liberty base style with the custom Violet Night overlay.
 - Python 3 standard library for the local static HTTP server.
 
 MapLibre GL JS is a browser renderer from the MapLibre project. Its official repository and releases are available at https://github.com/maplibre/maplibre-gl-js.
