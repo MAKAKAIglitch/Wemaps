@@ -441,6 +441,11 @@
       drawBroadleaf(27, 13, 40, "#315b46", "#78a16d");
       drawBroadleaf(72, 47, 34, "#294f40", "#668f65");
       drawBroadleaf(77, 3, 25, "#315b46", "#78a16d");
+    } else if (kind === "mixed") {
+      drawBroadleaf(22, 10, 31, "#315b46", "#78a16d");
+      drawPine(72, 43, 37, "#294e40", "#6b9b6e");
+      drawBroadleaf(76, 2, 24, "#315b46", "#78a16d");
+      drawPine(20, 64, 24, "#294e40", "#5e8a62");
     } else if (kind === "orchard") {
       [[19, 20], [67, 20], [19, 68], [67, 68]].forEach(([x, y]) => {
         drawBroadleaf(x, y, 22, "#47714b", "#9ab96b");
@@ -468,7 +473,7 @@
 
   function registerVegetationPatterns() {
     const patterns = [
-      ["wemaps-forest-generic", "broadleaf"],
+      ["wemaps-forest-generic", "mixed"],
       ["wemaps-forest-pine", "pine"],
       ["wemaps-forest-broadleaf", "broadleaf"],
       ["wemaps-orchard", "orchard"],
