@@ -4,8 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -18,24 +20,33 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.wemaps.app.location.DeviceLocation
+import org.wemaps.app.map.DeviceLocationMarker
 import org.wemaps.app.map.MapPalette
 import org.wemaps.app.map.MapStyleConfig
 import org.wemaps.app.map.MapStyleConfigurer
+import org.wemaps.app.map.OsmLaneMarkingsOverlay
 
 @Composable
 fun MapLibreMapView(
     palette: MapPalette,
+    location: DeviceLocation?,
     modifier: Modifier = Modifier,
     onStyleReady: (map: MapLibreMap, buildingsAvailable: Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnStyleReady by rememberUpdatedState(onStyleReady)
+    val latestLocation by rememberUpdatedState(location)
 
     val mapView = remember(context) {
         MapView(context).apply {
             onCreate(null)
         }
+    }
+    var activeStyle by remember(mapView) { mutableStateOf<Style?>(null) }
+    var roadMarkingsOverlay by remember(mapView) {
+        mutableStateOf<OsmLaneMarkingsOverlay?>(null)
     }
 
     DisposableEffect(mapView, lifecycle) {
@@ -87,6 +98,8 @@ fun MapLibreMapView(
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
+            roadMarkingsOverlay?.close()
+            roadMarkingsOverlay = null
             if (resumed) mapView.onPause()
             if (started) mapView.onStop()
             mapView.onDestroy()
@@ -98,6 +111,11 @@ fun MapLibreMapView(
         modifier = modifier
     )
 
+    LaunchedEffect(location, activeStyle) {
+        val fix = location ?: return@LaunchedEffect
+        DeviceLocationMarker.update(activeStyle, fix)
+    }
+
     LaunchedEffect(mapView) {
         mapView.getMapAsync { map ->
             map.uiSettings.isCompassEnabled = false
@@ -108,18 +126,32 @@ fun MapLibreMapView(
 
             map.setStyle(Style.Builder().fromUri(MapStyleConfig.styleUrl)) { style ->
                 val buildingsAvailable = MapStyleConfigurer.apply(style, palette)
+                DeviceLocationMarker.install(style)
 
+                roadMarkingsOverlay?.close()
+                roadMarkingsOverlay = OsmLaneMarkingsOverlay(map, style)
+                activeStyle = style
+
+                // Do not pretend that a fixed sample city is the device's location.
+                // A live fix will move the camera as soon as Android provides one.
+                val fix = latestLocation
+                val initialTarget = if (fix != null) {
+                    LatLng(fix.latitude, fix.longitude)
+                } else {
+                    LatLng(0.0, 0.0)
+                }
+                val initialZoom = if (fix != null) 16.2 else 2.6
                 map.moveCamera(
                     CameraUpdateFactory.newCameraPosition(
                         CameraPosition.Builder()
-                            // Neutral sample camera until on-device GNSS positioning is integrated.
-                            .target(LatLng(52.517, 13.388))
-                            .zoom(15.2)
-                            .tilt(52.0)
+                            .target(initialTarget)
+                            .zoom(initialZoom)
+                            .tilt(if (fix != null) 48.0 else 0.0)
                             .bearing(0.0)
                             .build()
                     )
                 )
+
                 currentOnStyleReady(map, buildingsAvailable)
             }
         }
