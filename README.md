@@ -22,7 +22,7 @@ The initial product is an online-first Android client. It will use compatible th
 
 ## Map appearance
 
-The first visible map prototype uses an editable **Waze-inspired dark palette**: deep navy/blue-grey backgrounds and roads, restrained road hierarchy, and a strongly contrasting route. Initial color tokens are documented in [the product specification](docs/PRODUCT_SPEC.md). These values are a visual approximation, not official Waze design constants or copied Waze assets.
+The first visible map prototype uses an editable **Waze-inspired dark palette**: deep navy/blue-grey backgrounds and roads, restrained road hierarchy, and a strongly contrasting route. Initial color tokens are documented in [the product specification](docs/PRODUCT_SPEC.md) and the editable [map style presets](design/map-style-presets.json). These values are a visual approximation, not official Waze design constants or copied Waze assets.
 
 All map colors must be centralized in editable style tokens. The style system must support named presets and custom overrides. The earlier **Violet Night** purple palette remains a separate preset for future experimentation. Changing the active palette must not require rewriting map layers or rendering logic.
 
@@ -150,6 +150,7 @@ See:
 - [Roadmap](docs/ROADMAP.md)
 - [Data attribution](docs/ATTRIBUTION.md)
 - [Road rendering and camera performance](docs/ROAD_RENDERING.md)
+- [Editable map style presets](design/map-style-presets.json)
 - [Contributing guide](CONTRIBUTING.md)
 
 ## Licensing and data attribution
