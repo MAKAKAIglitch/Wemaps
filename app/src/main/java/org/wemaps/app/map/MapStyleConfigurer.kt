@@ -34,7 +34,7 @@ object MapStyleConfigurer {
         setFillColor(style, "landuse_residential", palette.urban)
         setFillColor(style, "landcover_wood", palette.park)
         setFillColor(style, "landuse_park", palette.park)
-        setFillColor(style, "building", palette.buildingSide)
+        setFillColor(style, "building", palette.buildingSide, opaque = true)
     }
 
     private fun setBackgroundColor(style: Style, layerId: String, color: String) {
@@ -47,9 +47,21 @@ object MapStyleConfigurer {
         layer.setProperties(PropertyFactory.lineColor(color))
     }
 
-    private fun setFillColor(style: Style, layerId: String, color: String) {
+    private fun setFillColor(
+        style: Style,
+        layerId: String,
+        color: String,
+        opaque: Boolean = false
+    ) {
         val layer = style.getLayer(layerId) as? FillLayer ?: return
-        layer.setProperties(PropertyFactory.fillColor(color))
+        if (opaque) {
+            layer.setProperties(
+                PropertyFactory.fillColor(color),
+                PropertyFactory.fillOpacity(1.0f)
+            )
+        } else {
+            layer.setProperties(PropertyFactory.fillColor(color))
+        }
     }
 
     private fun addBuildingExtrusions(style: Style, color: String): Boolean {
@@ -69,7 +81,7 @@ object MapStyleConfigurer {
                 PropertyFactory.fillExtrusionColor(Color.parseColor(color)),
                 PropertyFactory.fillExtrusionHeight(Expression.get("render_height")),
                 PropertyFactory.fillExtrusionBase(Expression.get("render_min_height")),
-                PropertyFactory.fillExtrusionOpacity(0.94f),
+                PropertyFactory.fillExtrusionOpacity(1.0f),
                 PropertyFactory.fillExtrusionVerticalGradient(true)
             )
         }
