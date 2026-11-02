@@ -18,12 +18,17 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Integrate MapLibre Native Android.
 - [ ] Load a compatible third-party vector-map style.
 - [ ] Add required map attribution.
-- [ ] Implement the Violet Night map style.
+- [ ] Implement the first editable Waze-inspired dark map palette using centralized style tokens.
+- [ ] Keep Violet Night as a separate selectable style preset; do not hard-code colors into individual layers.
+- [ ] Define a style configuration format that supports named presets and custom color overrides.
 - [ ] Open directly into the map.
 - [ ] Implement the compact bottom dock.
 - [ ] Add basic zoom, rotation, recenter, and compass controls.
+- [ ] Prototype detailed road lanes at close zoom levels using lane counts, directional lane counts, and turn-lane attributes where available.
+- [ ] Render lane separators and per-lane direction arrows without claiming generated geometry is surveyed road paint.
+- [ ] Verify that the selected vector-tile source exposes the required road and lane attributes.
 
-**Milestone:** a working map screen with no project-operated server.
+**Milestone:** a working online map screen with editable colors and an initial detailed-lane rendering prototype, without a project-operated server.
 
 ## Stage 2 — 3D map quality
 
@@ -34,15 +39,16 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Profile GPU, memory, battery, and frame pacing on real Android devices.
 - [ ] Verify readability in dense city centers and at highway interchanges.
 
-**Milestone:** a polished Violet Night 3D map prototype.
+**Milestone:** a polished 3D map prototype with switchable style presets.
 
 ## Stage 2A — Road cartography and loading performance
 
-- [ ] Define road casing, surface, and lane-marking styles for Violet Night.
+- [ ] Define palette-driven road casing, surface, lane-marking, and active-route lane styles.
 - [ ] Verify that the selected vector-tile provider exposes OSM physical-width and lane attributes; reject sources that strip required properties if accurate width rendering is a release requirement.
 - [ ] Use OSM physical-width and lane attributes where available.
 - [ ] Separate mapped width from estimated and renderer-fallback widths.
 - [ ] Add zoom-dependent road widths and geometry detail.
+- [ ] Highlight route-compatible lanes in bright white and other lanes in muted grey when route guidance is available, following the general Yandex Navigator lane-guidance pattern.
 - [ ] Ensure lane separators remain legible without pretending unmapped markings are source data.
 - [ ] Implement viewport-bounded, incremental vector-tile loading.
 - [ ] Cancel obsolete requests and deduplicate features across tile boundaries.
