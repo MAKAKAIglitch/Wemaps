@@ -23,6 +23,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
+      - name: Validate Windows build PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in (Get-ChildItem windows-build -Filter '*.ps1' -File)) {
+            $tokens = $null
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count -gt 0) {
+              $details = ($parseErrors | ForEach-Object { '{0}: {1}' -f $_.Extent.StartLineNumber, $_.Message }) -join [Environment]::NewLine
+              throw ('PowerShell syntax errors in ' + $file.Name + ':' + [Environment]::NewLine + $details)
+            }
+          }
+          Write-Host 'Windows build PowerShell syntax check passed.'
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
@@ -104,7 +119,12 @@ jobs:
           $env:CI = "true"
 
           $probeProject = Join-Path $fakeProfile "AndroidStudioProjects\SdkProbe"
-          New-Item -ItemType Directory -Force -Path (Join-Path $fakeSdk "platforms"), $probeProject, $fakeAppData, $fakeLocalAppData | Out-Null
+          $fakePlatform = Join-Path $fakeSdk "platforms\android-37.1"
+          $fakeBuildTools = Join-Path $fakeSdk "build-tools\36.0.0"
+          New-Item -ItemType Directory -Force -Path $fakePlatform, $fakeBuildTools, $probeProject, $fakeAppData, $fakeLocalAppData | Out-Null
+          [System.IO.File]::WriteAllText((Join-Path $fakePlatform "android.jar"), "fake platform")
+          [System.IO.File]::WriteAllText((Join-Path $fakeBuildTools "aapt2.exe"), "fake aapt2")
+          [System.IO.File]::WriteAllText((Join-Path $fakeBuildTools "zipalign.exe"), "fake zipalign")
           $sdkForProperties = $fakeSdk.Replace('\', '/')
           Set-Content -Path (Join-Path $probeProject "local.properties") -Value "sdk.dir=$sdkForProperties" -Encoding ascii
 
