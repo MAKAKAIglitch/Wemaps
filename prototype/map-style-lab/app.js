@@ -1370,18 +1370,20 @@
       }
 
       const speedCamera = tags.highway === "speed_camera";
-      const trafficCamera = tags.man_made === "surveillance"
-        && /^(camera|alpr)$/i.test(tags["surveillance:type"] || "")
-        && /^(traffic|road|street|motorway)$/i.test(tags["surveillance:zone"] || "");
-      if (!speedCamera && !trafficCamera) return;
+      const surveillanceCamera = tags.man_made === "surveillance"
+        && /^(camera|alpr)$/i.test(tags["surveillance:type"] || "");
+      if (!speedCamera && !surveillanceCamera) return;
 
       seen.add(id);
       cameras += 1;
       const bearing = parseBearing(tags["camera:direction"] || tags.direction);
+      const roadZone = /^(traffic|road|street|motorway)$/i.test(tags["surveillance:zone"] || "");
       const properties = {
         kind: "camera",
         osmId: id,
-        cameraType: speedCamera ? "Контроль скорости" : "Дорожное наблюдение",
+        cameraType: speedCamera
+          ? "Контроль скорости"
+          : (roadZone ? "Дорожное наблюдение" : "Видеонаблюдение OSM"),
         maxspeed: tags.maxspeed || "",
         direction: bearing === null ? 0 : bearing,
         directionKnown: bearing === null ? "no" : "yes",
@@ -1458,7 +1460,7 @@
       "[out:json][timeout:8];",
       "(",
       'node["highway"="speed_camera"](' + bbox + ");",
-      'nwr["man_made"="surveillance"]["surveillance:type"~"^(camera|ALPR)$"]["surveillance:zone"~"^(traffic|road|street|motorway)$"](' + bbox + ");",
+      'nwr["man_made"="surveillance"]["surveillance:type"~"^(camera|ALPR)$"](' + bbox + ");",
       'node["highway"="motorway_junction"](' + bbox + ");",
       ");out center tags;"
     ].join("");
