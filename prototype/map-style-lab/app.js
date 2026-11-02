@@ -403,79 +403,48 @@
         ["to-number", ["get", "lanes:backward"], 0]
       ],
       ["match", ["get", "class"],
-        "motorway", 4,
-        "trunk", 2,
-        "primary", 2,
-        "secondary", 2,
-        "tertiary", 2,
-        "minor", 2,
-        0
+        "motorway", 4, "trunk", 2, "primary", 2,
+        "secondary", 2, "tertiary", 2, "minor", 2, 0
       ]
     ];
   }
 
-  function roadWidthExpression(multiplier = 1, extraMeters = 0, widthFactor = 1) {
+  function pixelsPerMeterAtZoom(zoom) {
+    const latitude = map ? map.getCenter().lat : 52.52;
+    const circumference = 40075016.68557849
+      * Math.max(0.087, Math.cos(latitude * Math.PI / 180));
+    return (512 * Math.pow(2, zoom)) / circumference;
+  }
+
+  function roadWidthExpression(multiplier = 1, extraMeters = 0, factor = 1) {
     const lanes = roadLaneCountExpression();
     const hasLaneTags = [
-      "any",
-      ["has", "lanes"],
-      ["has", "lanes:forward"],
-      ["has", "lanes:backward"]
+      "any", ["has", "lanes"], ["has", "lanes:forward"], ["has", "lanes:backward"]
     ];
     const widthTag = ["to-number", ["get", "width"], 0];
-    const validWidthTag = ["all", ["has", "width"], [">", widthTag, 0]];
-    const shoulder = [
+    const validWidth = ["all", ["has", "width"], [">", widthTag, 0]];
+    const laneWidth = [
+      "+", ["*", ["max", 1, ["min", 12, lanes]], 3.25], 0.35
+    ];
+    const classWidth = [
       "match", ["get", "class"],
-      "motorway", 2.4,
-      "trunk", 1.8,
-      "primary", 1.3,
-      "secondary", 0.9,
-      "tertiary", 0.5,
-      "minor", 0.35,
-      0.15
+      "motorway", 12.5, "trunk", 10.5, "primary", 9.5,
+      "secondary", 8.2, "tertiary", 7.2, "minor", 6.4,
+      "street", 6.4, "street_limited", 6.4,
+      "service", 4.6, "track", 3.6, "path", 2.0,
+      "pedestrian", 3.2, 5.0
     ];
-    const laneWidthMeters = [
-      "+",
-      ["*", ["max", 1, ["min", 12, lanes]], 3.25],
-      shoulder
-    ];
-    const classWidthMeters = [
-      "match", ["get", "class"],
-      "motorway", 12.5,
-      "trunk", 10.5,
-      "primary", 9.5,
-      "secondary", 8.2,
-      "tertiary", 7.2,
-      "minor", 6.4,
-      "street", 6.4,
-      "street_limited", 6.4,
-      "service", 4.6,
-      "track", 3.6,
-      "path", 2.0,
-      "pedestrian", 3.2,
-      5.0
-    ];
-    const physicalWidthMeters = [
+    const widthMeters = [
       "case",
-      validWidthTag, widthTag,
-      ["all", hasLaneTags, [">", lanes, 0]], laneWidthMeters,
-      classWidthMeters
+      validWidth, widthTag,
+      ["all", hasLaneTags, [">", lanes, 0]], laneWidth,
+      classWidth
     ];
-
-    const latitude = map ? map.getCenter().lat : 52.52;
-    const circumferenceAtLatitude = 40075016.68557849
-      * Math.max(0.087, Math.cos(latitude * Math.PI / 180));
-    const expression = ["interpolate", ["exponential", 2], ["zoom"]];
-    for (let zoom = 5; zoom <= 20; zoom += 1) {
-      const pixelsPerMeter = (512 * Math.pow(2, zoom)) / circumferenceAtLatitude;
-      expression.push(zoom, [
-        "*",
-        ["+", ["*", physicalWidthMeters, multiplier, roadWidthScale], extraMeters * roadWidthScale],
-        pixelsPerMeter,
-        widthFactor
-      ]);
-    }
-    return expression;
+    return [
+      "interpolate", ["exponential", 2], ["zoom"],
+      5, ["+", ["*", widthMeters, multiplier, roadWidthScale, factor, pixelsPerMeterAtZoom(5)], extraMeters * roadWidthScale * pixelsPerMeterAtZoom(5)],
+      20, ["+", ["*", widthMeters, multiplier, roadWidthScale, factor, pixelsPerMeterAtZoom(20)], extraMeters * roadWidthScale * pixelsPerMeterAtZoom(20)]
+    ];
   }
 
   function refreshLayerCache() {
@@ -769,10 +738,18 @@
     if (!road) return;
 
     const firstSymbol = map.getStyle().layers.find((layer) => layer.type === "symbol");
-    const symbolBefore = firstSymbol ? firstSymbol.id : undefined;
+    const beforeId = firstSymbol ? firstSymbol.id : undefined;
     const baseFilter = roadFilter();
     const bridgeFilter = ["all", baseFilter, ["==", ["get", "brunnel"], "bridge"]];
     const rampFilter = ["all", baseFilter, ["==", ["get", "ramp"], 1]];
+    const laneCount = roadLaneCountExpression();
+    const laneFilter = [
+      "all",
+      ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"]]],
+      [">=", laneCount, 2],
+      ["!=", ["get", "brunnel"], "tunnel"]
+    ];
+    const multiLaneFilter = ["all", laneFilter, [">=", laneCount, 3]];
 
     if (!map.getLayer("wemaps-road-depth-shadow")) {
       map.addLayer({
@@ -780,56 +757,18 @@
         type: "line",
         source: road.source,
         "source-layer": road.sourceLayer,
-        minzoom: 9.5,
+        minzoom: 10,
         filter: baseFilter,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": "#080610",
-          "line-width": roadWidthExpression(1.42, 1.6),
-          "line-opacity": 0.62,
-          "line-blur": 1.1,
-          "line-translate": [0, 1.8],
+          "line-width": roadWidthExpression(1.2, 1.0),
+          "line-opacity": 0.48,
+          "line-blur": 0.9,
+          "line-translate": [0, 1.3],
           "line-translate-anchor": "viewport"
         }
-      }, symbolBefore);
-    }
-
-    if (!map.getLayer("wemaps-road-top-sheen")) {
-      map.addLayer({
-        id: "wemaps-road-top-sheen",
-        type: "line",
-        source: road.source,
-        "source-layer": road.sourceLayer,
-        minzoom: 12.5,
-        filter: baseFilter,
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": "#f7eaff",
-          "line-width": roadWidthExpression(0.28, 0),
-          "line-opacity": 0.2,
-          "line-blur": 0.2
-        }
-      }, symbolBefore);
-    }
-
-    if (!map.getLayer("wemaps-bridge-shadow")) {
-      map.addLayer({
-        id: "wemaps-bridge-shadow",
-        type: "line",
-        source: road.source,
-        "source-layer": road.sourceLayer,
-        minzoom: 10.5,
-        filter: bridgeFilter,
-        layout: { "line-cap": "butt", "line-join": "round" },
-        paint: {
-          "line-color": "#07050d",
-          "line-width": roadWidthExpression(1.42, 2.0),
-          "line-opacity": 0.9,
-          "line-translate": [0, 3.2],
-          "line-translate-anchor": "viewport",
-          "line-blur": 0.9
-        }
-      }, symbolBefore);
+      }, beforeId);
     }
 
     if (!map.getLayer("wemaps-bridge-deck-edge")) {
@@ -842,29 +781,11 @@
         filter: bridgeFilter,
         layout: { "line-cap": "butt", "line-join": "round" },
         paint: {
-          "line-color": "#2b203a",
-          "line-width": roadWidthExpression(1.12, 0.8),
+          "line-color": "#241b32",
+          "line-width": roadWidthExpression(1.12, 0.9),
           "line-opacity": 0.96
         }
-      }, symbolBefore);
-    }
-
-    if (!map.getLayer("wemaps-bridge-deck-sheen")) {
-      map.addLayer({
-        id: "wemaps-bridge-deck-sheen",
-        type: "line",
-        source: road.source,
-        "source-layer": road.sourceLayer,
-        minzoom: 12,
-        filter: bridgeFilter,
-        layout: { "line-cap": "butt", "line-join": "round" },
-        paint: {
-          "line-color": "#d9c0f6",
-          "line-width": roadWidthExpression(0.82, 0),
-          "line-opacity": 0.25,
-          "line-blur": 0.15
-        }
-      }, symbolBefore);
+      }, beforeId);
     }
 
     if (!map.getLayer("wemaps-ramp-highlight")) {
@@ -873,56 +794,61 @@
         type: "line",
         source: road.source,
         "source-layer": road.sourceLayer,
-        minzoom: 11.5,
+        minzoom: 12,
         filter: rampFilter,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#dfc0ff",
-          "line-width": roadWidthExpression(1.02, 0.15),
-          "line-opacity": 0.32,
-          "line-blur": 0.35
+          "line-color": "#dbbdff",
+          "line-width": roadWidthExpression(1.04, 0.2),
+          "line-opacity": 0.28
         }
-      }, symbolBefore);
+      }, beforeId);
     }
 
-    const laneCountExpression = roadLaneCountExpression();
-    const laneClasses = ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"];
-    const laneLineWidth = [
-      "interpolate", ["linear"], ["zoom"],
-      14.5, 0.45,
-      16, 0.7,
-      18, 0.95
-    ];
-
-    for (let lanes = 2; lanes <= 6; lanes += 1) {
-      for (let divider = 1; divider < lanes; divider += 1) {
-        const id = "wemaps-road-lanes-" + lanes + "-" + divider;
-        if (map.getLayer(id)) continue;
-        const offsetRatio = divider / lanes - 0.5;
-        map.addLayer({
-          id,
-          type: "line",
-          source: road.source,
-          "source-layer": road.sourceLayer,
-          minzoom: 14.5,
-          filter: [
-            "all",
-            ["in", ["get", "class"], ["literal", laneClasses]],
-            ["==", laneCountExpression, lanes],
-            ["!=", ["get", "brunnel"], "tunnel"]
+    if (!map.getLayer("wemaps-road-lane-center")) {
+      map.addLayer({
+        id: "wemaps-road-lane-center",
+        type: "line",
+        source: road.source,
+        "source-layer": road.sourceLayer,
+        minzoom: 14.5,
+        filter: laneFilter,
+        layout: { "line-cap": "butt", "line-join": "round" },
+        paint: {
+          "line-color": "#fff3ff",
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            14.5, 0.85, 17, 1.15, 20, 1.45
           ],
-          layout: { "line-cap": "butt", "line-join": "round" },
-          paint: {
-            "line-color": "#f2e7ff",
-            "line-width": laneLineWidth,
-            "line-offset": ["*", roadWidthExpression(1, 0), offsetRatio],
-            "line-opacity": 0.76,
-            "line-dasharray": ["literal", [2.4, 2.8]],
-            "line-blur": 0.04
-          }
-        }, symbolBefore);
-      }
+          "line-opacity": 0.94,
+          "line-dasharray": ["literal", [3, 2.4]]
+        }
+      }, beforeId);
     }
+
+    [-1, 1].forEach((side) => {
+      const id = side < 0 ? "wemaps-road-lane-outer-left" : "wemaps-road-lane-outer-right";
+      if (map.getLayer(id)) return;
+      map.addLayer({
+        id,
+        type: "line",
+        source: road.source,
+        "source-layer": road.sourceLayer,
+        minzoom: 15.5,
+        filter: multiLaneFilter,
+        layout: { "line-cap": "butt", "line-join": "round" },
+        paint: {
+          "line-color": "#eadcff",
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            15.5, 0.72, 18, 1.05, 20, 1.25
+          ],
+          "line-offset": roadWidthExpression(1, 0, side * 0.25),
+          "line-opacity": 0.86,
+          "line-dasharray": ["literal", [2.8, 2.4]]
+        }
+      }, beforeId);
+    });
   }
 
   function parseBearing(value) {
@@ -1314,32 +1240,33 @@
     }, 550);
   }
 
-  function refreshRoadWidthExpressions() {
+  function refreshRoadWidthExpressions(force = false) {
     if (!map || !layerCache) return;
+    const latitude = map.getCenter().lat;
+    if (!force && Number.isFinite(lastRoadScaleLatitude)
+      && Math.abs(latitude - lastRoadScaleLatitude) < 0.2) return;
+    lastRoadScaleLatitude = latitude;
+
     layerCache.transportation.forEach((layer) => {
       const id = String(layer.id || "").toLowerCase();
       if (/rail|aerialway|ferry|transit|cable/.test(id)) return;
-      map.setPaintProperty(layer.id, "line-width", roadWidthExpression(id.includes("casing") ? 1.58 : 1));
+      map.setPaintProperty(layer.id, "line-width", roadWidthExpression(id.includes("casing") ? 1.42 : 1));
     });
 
-    const widthLayers = [
-      ["wemaps-road-depth-shadow", 1.42, 1.6],
-      ["wemaps-road-top-sheen", 0.28, 0],
-      ["wemaps-bridge-shadow", 1.42, 2],
-      ["wemaps-bridge-deck-edge", 1.12, 0.8],
-      ["wemaps-bridge-deck-sheen", 0.82, 0],
-      ["wemaps-ramp-highlight", 1.02, 0.15]
-    ];
-    widthLayers.forEach(([id, multiplier, extra]) => {
-      if (map.getLayer(id)) map.setPaintProperty(id, "line-width", roadWidthExpression(multiplier, extra));
-    });
-    for (let lanes = 2; lanes <= 6; lanes += 1) {
-      for (let divider = 1; divider < lanes; divider += 1) {
-        const id = "wemaps-road-lanes-" + lanes + "-" + divider;
-        if (map.getLayer(id)) {
-          map.setPaintProperty(id, "line-offset", roadWidthExpression(1, 0, divider / lanes - 0.5));
-        }
+    [
+      ["wemaps-road-depth-shadow", 1.2, 1.0],
+      ["wemaps-bridge-deck-edge", 1.12, 0.9],
+      ["wemaps-ramp-highlight", 1.04, 0.2]
+    ].forEach(([id, multiplier, extra]) => {
+      if (map.getLayer(id)) {
+        map.setPaintProperty(id, "line-width", roadWidthExpression(multiplier, extra));
       }
+    });
+    if (map.getLayer("wemaps-road-lane-outer-left")) {
+      map.setPaintProperty("wemaps-road-lane-outer-left", "line-offset", roadWidthExpression(1, 0, -0.25));
+    }
+    if (map.getLayer("wemaps-road-lane-outer-right")) {
+      map.setPaintProperty("wemaps-road-lane-outer-right", "line-offset", roadWidthExpression(1, 0, 0.25));
     }
   }
 
