@@ -1,7 +1,15 @@
 package org.wemaps.app.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
+import android.os.Looper
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,7 +33,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,14 +44,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,10 +60,9 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
+import org.wemaps.app.location.DeviceLocation
 import org.wemaps.app.map.MapStyleConfig
 import org.wemaps.app.map.MapPalette
-
-private val DemoCenter = LatLng(52.517, 13.388)
 
 @Composable
 fun MapScreen() {
@@ -66,9 +74,166 @@ fun MapScreen() {
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var styleLoaded by remember { mutableStateOf(false) }
     var buildingsAvailable by remember { mutableStateOf(false) }
+    var deviceLocation by remember { mutableStateOf<DeviceLocation?>(null) }
+    var hasCenteredOnFirstFix by remember { mutableStateOf(false) }
+    var lastKnownBearing by remember { mutableFloatStateOf(0f) }
+
+    var hasFineLocationPermission by remember {
+        mutableStateOf(
+            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasCoarseLocationPermission by remember {
+        mutableStateOf(
+            context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val hasLocationPermission = hasFineLocationPermission || hasCoarseLocationPermission
 
     fun showMessage(message: String) {
         scope.launch { snackbarState.showSnackbar(message) }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        hasFineLocationPermission =
+            result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        hasCoarseLocationPermission =
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
+                context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        if (!hasFineLocationPermission && !hasCoarseLocationPermission) {
+            showMessage("Для отображения твоего положения разреши Wemaps доступ к местоположению.")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasLocationPermission) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    DisposableEffect(context, hasLocationPermission, hasFineLocationPermission) {
+        if (!hasLocationPermission) {
+            onDispose { }
+        } else {
+            val locationManager =
+                context.getSystemService(android.content.Context.LOCATION_SERVICE) as LocationManager
+
+            fun acceptLocation(fix: Location) {
+                val hasReliableCourse = fix.hasBearing() &&
+                    (!fix.hasSpeed() || fix.speed >= 0.8f)
+                if (hasReliableCourse) lastKnownBearing = fix.bearing
+
+                deviceLocation = DeviceLocation(
+                    latitude = fix.latitude,
+                    longitude = fix.longitude,
+                    bearing = if (hasReliableCourse) fix.bearing else lastKnownBearing,
+                    accuracyMeters = if (fix.hasAccuracy()) fix.accuracy else 999f,
+                    speedMetersPerSecond = if (fix.hasSpeed()) fix.speed else 0f,
+                    timestampMillis = fix.time
+                )
+            }
+
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    acceptLocation(location)
+                }
+            }
+
+            val providers = if (hasFineLocationPermission) {
+                listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            } else {
+                listOf(LocationManager.NETWORK_PROVIDER)
+            }
+
+            for (provider in providers) {
+                runCatching {
+                    if (!locationManager.isProviderEnabled(provider)) return@runCatching
+
+                    locationManager.getLastKnownLocation(provider)?.let { lastFix ->
+                        if (lastFix.time > (deviceLocation?.timestampMillis ?: 0L)) {
+                            acceptLocation(lastFix)
+                        }
+                    }
+
+                    locationManager.requestLocationUpdates(
+                        provider,
+                        1_200L,
+                        1.5f,
+                        listener,
+                        Looper.getMainLooper()
+                    )
+                }.onFailure {
+                    // A missing or disabled provider should not prevent the other provider working.
+                }
+            }
+
+            onDispose {
+                runCatching { locationManager.removeUpdates(listener) }
+            }
+        }
+    }
+
+    LaunchedEffect(deviceLocation, map, styleLoaded) {
+        val fix = deviceLocation ?: return@LaunchedEffect
+        val readyMap = map ?: return@LaunchedEffect
+
+        if (!hasCenteredOnFirstFix) {
+            readyMap.animateCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(LatLng(fix.latitude, fix.longitude))
+                        .zoom(16.4)
+                        .tilt(48.0)
+                        .bearing(0.0)
+                        .build()
+                ),
+                650
+            )
+            hasCenteredOnFirstFix = true
+        }
+    }
+
+    fun centerOnCurrentLocation() {
+        val fix = deviceLocation
+        if (fix == null) {
+            if (!hasLocationPermission) {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            } else {
+                showMessage("Получаем местоположение. Подожди появления GPS-точки.")
+            }
+            return
+        }
+
+        map?.animateCamera(
+            CameraUpdateFactory.newCameraPosition(
+                CameraPosition.Builder()
+                    .target(LatLng(fix.latitude, fix.longitude))
+                    .zoom(16.8)
+                    .tilt(50.0)
+                    .bearing(0.0)
+                    .build()
+            ),
+            420
+        )
+        hasCenteredOnFirstFix = true
     }
 
     Box(
@@ -78,6 +243,7 @@ fun MapScreen() {
     ) {
         MapLibreMapView(
             palette = palette,
+            location = deviceLocation,
             modifier = Modifier.fillMaxSize(),
             onStyleReady = { readyMap, hasBuildings ->
                 map = readyMap
@@ -86,7 +252,6 @@ fun MapScreen() {
             }
         )
 
-        // Map-first layout: search floats above the map; the compact dock stays at the bottom.
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -145,34 +310,12 @@ fun MapScreen() {
 
                 MapBottomDock(
                     palette = palette,
-                    onMap = {
-                        map?.let { current ->
-                            current.animateCamera(
-                                CameraUpdateFactory.newCameraPosition(
-                                    CameraPosition.Builder()
-                                        .target(DemoCenter)
-                                        .zoom(15.2)
-                                        .tilt(52.0)
-                                        .bearing(0.0)
-                                        .build()
-                                ),
-                                280
-                            )
-                        }
-                    },
+                    onMap = { centerOnCurrentLocation() },
                     onSaved = { showMessage("Сохранённые места появятся в следующем этапе.") },
                     onLayers = { showMessage("Переключение картографических слоёв добавим отдельно.") }
                 )
             }
         }
-
-        // Original rounded direction-pointer artwork. It is a visual placeholder until GNSS
-        // positioning is connected; it is not yet a live device location.
-        RoundedPositionArrow(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = 34.dp)
-        )
 
         Column(
             modifier = Modifier
@@ -184,6 +327,12 @@ fun MapScreen() {
         ) {
             MapControlButton(
                 palette = palette,
+                glyph = MapGlyph.Location,
+                description = "Показать моё местоположение",
+                onClick = { centerOnCurrentLocation() }
+            )
+            MapControlButton(
+                palette = palette,
                 glyph = MapGlyph.Compass,
                 description = "Повернуть карту на север"
             ) {
@@ -192,7 +341,7 @@ fun MapScreen() {
                     current.animateCamera(
                         CameraUpdateFactory.newCameraPosition(
                             CameraPosition.Builder()
-                                .target(position.target ?: DemoCenter)
+                                .target(position.target ?: LatLng(0.0, 0.0))
                                 .zoom(position.zoom)
                                 .tilt(position.tilt)
                                 .bearing(0.0)
@@ -367,95 +516,13 @@ private fun MapControlButton(
     }
 }
 
-@Composable
-private fun RoundedPositionArrow(
-    modifier: Modifier = Modifier,
-    bearingDegrees: Float = 0f
-) {
-    Canvas(
-        modifier = modifier
-            .size(width = 58.dp, height = 64.dp)
-            .semantics {
-                contentDescription = "Предпросмотр округлённой стрелки положения; GPS ещё не подключён"
-            }
-    ) {
-        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-        drawCircle(
-            color = Color(0x55000000),
-            radius = size.minDimension * 0.45f,
-            center = center
-        )
-        drawCircle(
-            color = Color.White,
-            radius = size.minDimension * 0.34f,
-            center = center
-        )
-
-        rotate(degrees = bearingDegrees, pivot = center) {
-            val cx = center.x
-            val path = Path().apply {
-                moveTo(cx, size.height * 0.08f)
-                cubicTo(
-                    cx + size.width * 0.04f, size.height * 0.08f,
-                    cx + size.width * 0.07f, size.height * 0.12f,
-                    cx + size.width * 0.11f, size.height * 0.18f
-                )
-                lineTo(size.width * 0.86f, size.height * 0.56f)
-                cubicTo(
-                    size.width * 0.92f, size.height * 0.64f,
-                    size.width * 0.84f, size.height * 0.73f,
-                    size.width * 0.76f, size.height * 0.68f
-                )
-                lineTo(cx + size.width * 0.13f, size.height * 0.61f)
-                lineTo(cx + size.width * 0.13f, size.height * 0.85f)
-                cubicTo(
-                    cx + size.width * 0.13f, size.height * 0.96f,
-                    cx - size.width * 0.13f, size.height * 0.96f,
-                    cx - size.width * 0.13f, size.height * 0.85f
-                )
-                lineTo(cx - size.width * 0.13f, size.height * 0.61f)
-                lineTo(size.width * 0.24f, size.height * 0.68f)
-                cubicTo(
-                    size.width * 0.16f, size.height * 0.73f,
-                    size.width * 0.08f, size.height * 0.64f,
-                    size.width * 0.14f, size.height * 0.56f
-                )
-                lineTo(cx - size.width * 0.11f, size.height * 0.18f)
-                cubicTo(
-                    cx - size.width * 0.07f, size.height * 0.12f,
-                    cx - size.width * 0.04f, size.height * 0.08f,
-                    cx, size.height * 0.08f
-                )
-                close()
-            }
-
-            drawPath(path, color = Color(0xFF48A9F5))
-            drawPath(
-                path,
-                color = Color.White,
-                style = Stroke(
-                    width = 2.2.dp.toPx(),
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round
-                )
-            )
-            drawLine(
-                color = Color.White.copy(alpha = 0.55f),
-                start = androidx.compose.ui.geometry.Offset(cx, size.height * 0.19f),
-                end = androidx.compose.ui.geometry.Offset(cx, size.height * 0.48f),
-                strokeWidth = 1.4.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-        }
-    }
-}
-
 private enum class MapGlyph {
     Search,
     Map,
     Bookmark,
     Layers,
     Compass,
+    Location,
     Plus,
     Minus
 }
@@ -522,6 +589,47 @@ private fun MapGlyphIcon(
                 path.lineTo(w * 0.44f, h * 0.41f)
                 path.close()
                 drawPath(path, tint)
+            }
+            MapGlyph.Location -> {
+                drawCircle(
+                    tint,
+                    radius = w * 0.37f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.5f),
+                    style = stroke
+                )
+                drawCircle(
+                    tint,
+                    radius = w * 0.12f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.5f)
+                )
+                drawLine(
+                    tint,
+                    androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.02f),
+                    androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.19f),
+                    strokeWidth = stroke.width,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    tint,
+                    androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.81f),
+                    androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.98f),
+                    strokeWidth = stroke.width,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    tint,
+                    androidx.compose.ui.geometry.Offset(w * 0.02f, h * 0.5f),
+                    androidx.compose.ui.geometry.Offset(w * 0.19f, h * 0.5f),
+                    strokeWidth = stroke.width,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    tint,
+                    androidx.compose.ui.geometry.Offset(w * 0.81f, h * 0.5f),
+                    androidx.compose.ui.geometry.Offset(w * 0.98f, h * 0.5f),
+                    strokeWidth = stroke.width,
+                    cap = StrokeCap.Round
+                )
             }
             MapGlyph.Plus -> {
                 drawLine(tint, androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.15f), androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.85f), strokeWidth = stroke.width, cap = StrokeCap.Round)
