@@ -32,7 +32,7 @@ Application entry point, navigation between app features, dependency wiring, and
 
 ### core:designsystem
 
-- Centralized map-style tokens and named presets, initially stored in `design/map-style-presets.json` (Waze-inspired dark, Violet Night, custom overrides).
+- Centralized map-style tokens and named presets, initially stored in `design/map-style-presets.json` (Midnight Navigation dark, Violet Night, custom overrides).
 - Runtime style configuration without hard-coded colors in individual map layers.
 - Typography and shapes.
 - Material 3 theme integration.
