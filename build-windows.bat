@@ -12,112 +12,26 @@ echo ============================================================
 echo                     WEMAPS APK BUILDER
 echo ============================================================
 echo.
-echo [1/3] Checking Android SDK location...
+echo [1/3] Looking for the existing Android SDK...
 
+echo Checking environment variables, Android Studio settings, PATH, and other projects...
 set "SDK_ROOT="
-set "USE_LOCAL_PROPERTIES="
 
-if defined ANDROID_SDK_ROOT if exist "%ANDROID_SDK_ROOT%" set "SDK_ROOT=%ANDROID_SDK_ROOT%"
-if not defined SDK_ROOT if defined ANDROID_HOME if exist "%ANDROID_HOME%" set "SDK_ROOT=%ANDROID_HOME%"
+rem Search all known SDK locations without installing or changing anything.
+for /f "usebackq delims=" %%S in (`powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$roots = New-Object 'System.Collections.Generic.List[string]'; foreach ($v in @($env:ANDROID_HOME, $env:ANDROID_SDK_ROOT)) { if (-not [string]::IsNullOrWhiteSpace($v)) { [void]$roots.Add($v) } }; $lp = Join-Path $env:WEMAPS_PROJECT_DIR 'local.properties'; if (Test-Path -LiteralPath $lp) { $line = Get-Content -LiteralPath $lp | Where-Object { $_ -match '^\s*sdk\.dir\s*=' } | Select-Object -First 1; if ($line) { $v = ($line -replace '^\s*sdk\.dir\s*=\s*','') -replace '\\\\','\' -replace '\\:',':'; [void]$roots.Add($v) } }; $cfg = Join-Path $env:APPDATA 'Google'; if (Test-Path -LiteralPath $cfg) { Get-ChildItem -LiteralPath $cfg -Directory -Filter 'AndroidStudio*' -ErrorAction SilentlyContinue | ForEach-Object { $options = Join-Path $_.FullName 'options'; if (Test-Path -LiteralPath $options) { Get-ChildItem -LiteralPath $options -Filter '*.xml' -File -ErrorAction SilentlyContinue | ForEach-Object { try { [xml]$x = Get-Content -LiteralPath $_.FullName -Raw; $nodes = $x.SelectNodes('//component/option'); foreach ($n in $nodes) { if ($n.ParentNode.GetAttribute('name') -eq 'AndroidSdk' -and $n.GetAttribute('name') -eq 'sdkPath') { $v = $n.GetAttribute('value'); if ($v) { [void]$roots.Add($v) } } } } catch {} } } } }; foreach ($base in @((Join-Path $env:USERPROFILE 'AndroidStudioProjects'), (Join-Path $env:USERPROFILE 'IdeaProjects'), (Join-Path $env:USERPROFILE 'Projects'), (Join-Path $env:USERPROFILE 'source\repos'))) { if (Test-Path -LiteralPath $base) { Get-ChildItem -LiteralPath $base -Filter 'local.properties' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $line = Get-Content -LiteralPath $_.FullName | Where-Object { $_ -match '^\s*sdk\.dir\s*=' } | Select-Object -First 1; if ($line) { $v = ($line -replace '^\s*sdk\.dir\s*=\s*','') -replace '\\\\','\' -replace '\\:',':'; [void]$roots.Add($v) } } } }; foreach ($entry in ($env:Path -split ';')) { $p = $entry.Trim().Trim([char]34); if ($p -match '(?i)\\platform-tools\\?$' -or $p -match '(?i)\\emulator\\?$') { [void]$roots.Add((Split-Path $p -Parent)) } elseif ($p -match '(?i)\\cmdline-tools\\[^\\]+\\bin\\?$') { [void]$roots.Add((Split-Path (Split-Path (Split-Path $p -Parent) -Parent) -Parent)) } elseif ($p -match '(?i)\\tools\\bin\\?$') { [void]$roots.Add((Split-Path (Split-Path $p -Parent) -Parent)) } }; [void]$roots.Add((Join-Path $env:LOCALAPPDATA 'Android\Sdk')); [void]$roots.Add((Join-Path $env:USERPROFILE 'Android\Sdk')); foreach ($r in $roots) { if (-not [string]::IsNullOrWhiteSpace($r)) { $p = [Environment]::ExpandEnvironmentVariables($r.Trim().Trim([char]34)); if ((Test-Path -LiteralPath $p -PathType Container) -and ((Test-Path -LiteralPath (Join-Path $p 'platforms') -PathType Container) -or (Test-Path -LiteralPath (Join-Path $p 'platform-tools\adb.exe') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $p 'build-tools') -PathType Container))) { [Console]::WriteLine((Resolve-Path -LiteralPath $p).Path); exit 0 } } }"`) do if not defined SDK_ROOT set "SDK_ROOT=%%S"
 
-rem Android Studio normally writes a custom SDK path to local.properties.
-if not defined SDK_ROOT if exist "%PROJECT_DIR%local.properties" (
-    findstr /i /r /c:"^[ ]*sdk\.dir[ ]*=" "%PROJECT_DIR%local.properties" >nul 2>&1
-    if not errorlevel 1 set "USE_LOCAL_PROPERTIES=1"
+rem If automatic detection is unsuccessful, let the user choose the already installed SDK folder.
+if not defined SDK_ROOT (
+    echo.
+    echo SDK was not detected automatically. Select your existing Android SDK folder.
+    echo It is the folder that contains platforms, platform-tools, and build-tools.
+    for /f "usebackq delims=" %%S in (`powershell.exe -STA -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Select your existing Android SDK folder'; $d.ShowNewFolderButton = $false; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::WriteLine($d.SelectedPath) }"`) do if not defined SDK_ROOT set "SDK_ROOT=%%S"
 )
 
-rem Default Android Studio SDK location for Windows.
-if not defined SDK_ROOT if not defined USE_LOCAL_PROPERTIES (
-    if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\Android\Sdk" set "SDK_ROOT=%LOCALAPPDATA%\Android\Sdk"
-)
+if not defined SDK_ROOT goto :error_sdk
 
-if not defined SDK_ROOT if not defined USE_LOCAL_PROPERTIES goto :error_sdk
+if not exist "%SDK_ROOT%\platforms" if not exist "%SDK_ROOT%\platform-tools\adb.exe" if not exist "%SDK_ROOT%\build-tools" goto :error_sdk
 
-if defined SDK_ROOT (
-    set "ANDROID_HOME=%SDK_ROOT%"
-    set "ANDROID_SDK_ROOT=%SDK_ROOT%"
-    echo Android SDK: %SDK_ROOT%
-) else (
-    echo Android SDK path will be read from local.properties.
-)
-
-echo.
-echo [2/3] Starting Gradle and building the debug APK...
-echo Java 17+ will be detected automatically by the Wemaps launcher.
-echo The first build may download Gradle and project dependencies.
-echo.
-
-set "BUILD_LOG=%PROJECT_DIR%build-windows.log"
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$log = Join-Path $env:WEMAPS_PROJECT_DIR 'build-windows.log'; & (Join-Path $env:WEMAPS_PROJECT_DIR 'gradlew.bat') --no-daemon --console=plain --stacktrace :app:assembleDebug 2>&1 | Tee-Object -FilePath $log; exit $LASTEXITCODE"
-set "BUILD_EXIT=%ERRORLEVEL%"
-
-if not "%BUILD_EXIT%"=="0" goto :error_build
-
-echo.
-echo [3/3] Checking APK output...
-set "APK_SOURCE=%PROJECT_DIR%app\build\outputs\apk\debug\app-debug.apk"
-set "APK_DEST=%PROJECT_DIR%Wemaps-debug.apk"
-
-if not exist "%APK_SOURCE%" goto :error_apk
-copy /y "%APK_SOURCE%" "%APK_DEST%" >nul
-if errorlevel 1 goto :error_copy
-
-echo.
-echo ============================================================
-echo                  BUILD COMPLETED SUCCESSFULLY
-echo ============================================================
-echo.
-echo APK: %APK_DEST%
-echo Log: %BUILD_LOG%
-echo.
-set "EXIT_CODE=0"
-goto :finish
-
-:error_project
-echo ERROR: Could not open the project folder.
-set "EXIT_CODE=1"
-goto :finish
-
-:error_sdk
-echo ERROR: Android SDK was not found.
-echo.
-echo Install Android SDK through Android Studio, or set ANDROID_HOME
-echo or ANDROID_SDK_ROOT to your SDK folder.
-echo Required packages: Android SDK Platform 37.1 and Build-Tools 36.0.0.
-echo The SDK can also be configured in local.properties as sdk.dir=...
-set "EXIT_CODE=1"
-goto :finish
-
-:error_build
-echo.
-echo ============================================================
-echo                       BUILD FAILED
-echo ============================================================
-echo.
-echo Gradle exit code: %BUILD_EXIT%
-echo Full build output: %BUILD_LOG%
-echo.
-echo Send build-windows.log to get the exact error diagnosed.
-set "EXIT_CODE=%BUILD_EXIT%"
-if "%EXIT_CODE%"=="0" set "EXIT_CODE=1"
-goto :finish
-
-:error_apk
-echo ERROR: Gradle reported success, but the APK was not found:
-echo %APK_SOURCE%
-echo Check the build log: %BUILD_LOG%
-set "EXIT_CODE=1"
-goto :finish
-
-:error_copy
-echo ERROR: Could not copy the APK to:
-echo %APK_DEST%
-echo The original APK is at:
-echo %APK_SOURCE%
-set "EXIT_CODE=1"
-goto :finish
-
-:finish
-echo.
-if /i not "%CI%"=="true" pause
-exit /b %EXIT_CODE%
+set "ANDROID_HOME=%SDK_ROOT%"
+set "ANDROID_SDK_TÓÕITÑ×ÔÓÕ	HBXÚÈ[ÚYÑÎ	TÑ×ÔÓÕ	KCBBXÚËBXÚÈÌÌ×HÝ\[ÈÜYH[Z[[ÈHXYÈTËBXÚÈ]HMÊÈÚ[H]XÝY]]ÛX]XØ[HHHÙ[X\È][Ú\BXÚÈH\ÝZ[X^HÝÛØYÜYH[ÚXÝ\[[ÚY\ËBXÚËBBÙ]RSÓÑÏITÒPÕÑTXZ[]Ú[ÝÜËÙÈBÝÙ\Ú[^HSÓÙÛÈSÔÙ[HQ^XÝ][ÛÛXÞH\\ÜÈPÛÛ[X[ÙÈHÚ[T]	[ÑSPT×ÔÒPÕÑT	ØZ[]Ú[ÝÜËÙÉÎÈ	
+Ú[T]	[ÑSPT×ÔÒPÕÑT	ÙÜY]Ë]	ÊHK[ËYY[[ÛKXÛÛÛÛO\Z[K\ÝXÚÝXÙH\\ÜÙ[XQXYÈHYKSØXÝQ[T]	ÙÎÈ^]	TÕRUÓÑHBÙ]RSÑVUIQTÔUS	HBBYÝPRSÑVU	HOHÛÝÈ\ÜØZ[BBXÚËBXÚÈÌËÌ×HÚXÚÚ[ÈTÈÝ]]BÙ]T×ÔÓÕTÑOITÒPÕÑTX\Z[Ý]]×\×XY×\YXYË\ÈBÙ]T×ÑTÕITÒPÕÑTUÙ[X\ËYXYË\ÈBBYÝ^\ÝPT×ÔÓÕTÑIHÛÝÈ\ÜØ\ÃBÛÜHÞHPT×ÔÓÕTÑIHPT×ÑTÕ	H[BY\Ü][HÛÝÈ\ÜØÛÜCBBXÚËBXÚÈOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOCBXÚÈRSÓÓTUQÕPÐÑTÔÑSCBXÚÈOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOCBXÚËBXÚÈTÎ	PT×ÑTÕ	CBXÚÈÙÎ	PRSÓÑÉCBXÚËBÙ]VUÐÓÑOLBÛÝÈ[\ÚBB\ÜÜÚXÝBXÚÈTÔÛÝ[ÝÜ[HÚXÝÛ\BÙ]VUÐÓÑOLHBÛÝÈ[\ÚBB\ÜÜÙÃBXÚÈTÔÛÝ[ÝØØ]HH[Y[ÚYÑÈÛ\BXÚËBXÚÈÈÑÈØ\È[Ý[YÜÚ[ÙYH\ÈØÜ\BXÚÈÜ[[ÚYÝY[ÈHÙ][ÜÈH[ÚYÑÈÈÙYHH^\Ý[ÈÑÈØØ][ÛBXÚÈ[[\ÈUYØZ[[Ù[XÝ]Û\Ú[Û\YBXÚÈ\]Z\YXÚØYÙ\Î[ÚYÑÈ]ÜHÍËH[Z[UÛÛÈÍBÙ]VUÐÓÑOLHBÛÝÈ[\ÚBB\ÜØZ[BXÚËBXÚÈOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOCBXÚÈRSRSQBXÚÈOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOCBXÚËBXÚÈÜYH^]ÛÙN	PRSÑVU	CBXÚÈ[Z[Ý]]	PRSÓÑÉCBXÚËBXÚÈÙ[Z[]Ú[ÝÜËÙÈÈÙ]H^XÝ\ÜXYÛÜÙYBÙ]VUÐÓÑOIPRSÑVU	HBYQVUÐÓÑIHOHÙ]VUÐÓÑOLHBÛÝÈ[\ÚBB\ÜØ\ÃBXÚÈTÔÜYH\ÜYÝXØÙ\ÜË]HTÈØ\ÈÝÝ[BXÚÈ	PT×ÔÓÕTÑICBXÚÈÚXÚÈHZ[ÙÎ	PRSÓÑÉCBÙ]VUÐÓÑOLHBÛÝÈ[\ÚBB\ÜØÛÜCBXÚÈTÔÛÝ[ÝÛÜHHTÈÎBXÚÈ	PT×ÑTÕ	CBXÚÈHÜYÚ[[TÈ\È]BXÚÈ	PT×ÔÓÕTÑICBÙ]VUÐÓÑOLHBÛÝÈ[\ÚBB[\ÚBXÚËBYÚHÝPÒIHOHYH]\ÙCB^]Ø	QVUÐÓÑIÿÿÿ
