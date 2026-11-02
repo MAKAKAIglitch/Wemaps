@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Wemaps · Violet Night Style Lab</title>
+  <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="./app.css">
 </head>
@@ -64,7 +66,7 @@
 
         <section class="control-section">
           <div class="section-heading"><div><span class="section-index">04</span><h2>Камера</h2></div><span class="section-note">3D VIEW</span></div>
-          <div class="range-control"><div class="range-label"><label for="pitch">Наклон карты</label><output id="pitchValue">58°</output></div><input id="pitch" type="range" min="35" max="75" value="58"></div>
+          <div class="range-control"><div class="range-label"><label for="pitch">Наклон карты</label><output id="pitchValue">58°</output></div><input id="pitch" type="range" min="0" max="75" value="58"></div>
           <div class="range-control"><div class="range-label"><label for="zoom">Масштаб</label><output id="zoomValue">15.2</output></div><input id="zoom" type="range" min="5" max="19" step="0.1" value="15.2"></div>
           <div class="button-row"><button class="button button-secondary" id="resetCamera" type="button">Сбросить камеру</button><button class="button button-secondary" id="toggleBuildings" type="button">3D: включено</button></div>
         </section>
