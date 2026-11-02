@@ -102,46 +102,58 @@ When physical width is missing:
 
 Keep three provenance states separate in the internal model: mapped width, estimated width, and renderer fallback. Never call the latter two an exact OSM measurement.
 
-## 6. Visible lane markings
+## 6. Lane geometry and markings inspired by Yandex Navigator
 
-Use available OSM lane and marking attributes:
-- `lane_markings=yes/no`;
-- `lanes=*` and directional lane counts;
+The intended interaction pattern is detailed road lanes at close zoom and route-aware lane highlighting. Yandex Navigator documents a mode where lanes matching the route are shown in white, other lanes in grey, and each lane has an arrow indicating its direction. See [Yandex Navigator: Moving along a route](https://yandex.ru/support/navigator/ru/route-movement) and [Yandex Navigator: detailed road layouts](https://mobi.yandex.com/support/navigator/en/route-movement).
+
+Wemaps should implement its own rendering and data model; this is a design reference, not a request to copy Yandex assets or proprietary code.
+
+### Lane geometry inputs
+
+Use available OSM attributes:
+- `lanes=*`, `lanes:forward=*`, `lanes:backward=*`;
+- `width=*`, `est_width=*`, `width:lanes=*`;
+- `oneway=*`;
 - `turn:lanes=*`;
-- `change=*` and `overtaking=*`;
-- `width:lanes=*`;
-- `road_marking=*` and its related marking geometries;
-- `crossing:markings=*`.
+- `change=*`, `overtaking=*`;
+- `lane_markings=*`;
+- `bus:lanes=*`, `psv:lanes=*`, cycle-lane and tram-lane attributes where present;
+- separate `road_marking=*` geometries when available.
 
-The Violet Night style should use pale lavender or near-white markings with enough contrast to be seen clearly against dark-violet road surfaces. Preserve mapped yellow or other marking colours when known.
+### Rendering behaviour
 
-Rules:
-- If `lane_markings=no` is mapped, do not draw ordinary painted lane separators.
-- If `lane_markings=yes` is mapped, show lane separators at useful zoom levels.
-- Use `turn:lanes=*` for lane arrows or turn guidance only when the values are valid for the road direction.
-- Use separate `road_marking=*` geometries where supplied, especially around intersections.
-- If only a lane count exists, any generated lane guide must be internally marked and visually recognisable as schematic, not as an individually mapped real marking.
-- Do not invent solid/dashed centre-line patterns, stop lines, arrows, or exact intersection paint without source data or a clearly labelled schematic fallback.
+- At close zoom levels, show individual lane surfaces or separators where the source data is sufficient.
+- Draw a direction arrow per lane when valid `turn:lanes=*` data exists.
+- Respect the direction of one-way roads and separate carriageways.
+- When a route is active, show route-compatible lanes in bright white and non-matching lanes in muted grey. Do not hide the underlying carriageway shape.
+- Show bus, tram, and cycle lanes with distinct restrained symbols or markings only when the relevant tags are present.
+- Keep detailed lane markings hidden or simplified at small zoom levels; reveal them progressively as the user zooms in.
+- At complex junctions, lane arrows and lane geometry must follow the correct road direction, not merely the nearest line on screen.
+- Never render standard painted separators when `lane_markings=no` is mapped.
+- Where only lane count is known, generated lane divisions are schematic. Keep that provenance separate from mapped road-marking geometry.
 
-## 7. Road hierarchy and colour
+### Generated geometry limitations
 
-Initial Violet Night road palette:
+A basic OSM road is commonly represented by a centreline, not by a polygon for every lane. If the provider supplies no lane polygons or marking geometries, Wemaps may derive lane offsets from the centreline, road width, lane count, and direction. This requires curve-aware offsetting, joins, splits, and intersection handling. It is an approximation and must not be described as exact surveyed lane geometry.
 
-| Road element | Colour |
-|---|---|
-| Minor roads | `#655B7A` |
-| Local streets | `#80709F` |
-| Secondary roads | `#A18BC9` |
-| Main roads | `#B99CEB` |
-| Major roads | `#D1B7FF` |
-| Route casing | `#7139BA` |
-| Route line | `#D18AFF` |
-| Route highlight | `#F4DEFF` |
-| Markings | Pale lavender / near-white, subject to mapped colour |
+The selected vector tile provider must retain the relevant OSM properties. A style cannot use source tags that the provider strips from its tiles. Verify property coverage before choosing the provider for detailed-road rendering.
 
-Use layered road casing and surface strokes to separate the road from the background. Road class controls cartographic priority and colour; it must not overwrite actual width. A narrow mapped road must not become physically wide only because it has a high road-class priority.
+## 7. Editable map palettes
 
-## 8. Required tests
+Map colors must be centralized in one configuration layer. Individual style layers must reference semantic tokens rather than hard-coded color literals.
+
+Stage 1 uses a Waze-inspired dark palette. The values are defined in `docs/PRODUCT_SPEC.md`. They are visual starting values, not official Waze constants.
+
+The style system must support:
+- named presets;
+- a Waze-inspired dark default;
+- a separately retained Violet Night preset;
+- custom color overrides;
+- persistence of the selected preset and overrides in local app settings.
+
+A future in-app style editor should allow changing background, land, water, road classes, buildings, route, lanes, labels, and POI colors without changing map data or rendering algorithms.
+
+## 8. Required performance tests
 
 Test on low-, mid-, and high-tier Android devices:
 
@@ -155,7 +167,9 @@ Test on low-, mid-, and high-tier Android devices:
 - missing, stale, malformed, or directionless camera objects;
 - no network and provider rate-limit responses;
 - roads with mapped `width`, only `est_width`, only `lanes`, and no width information;
-- roads with `lane_markings=yes`, `lane_markings=no`, and no lane-marking tag.
+- roads with `lane_markings=yes`, `lane_markings=no`, and no lane-marking tag;
+- roads with `turn:lanes` and roads without lane-turn data;
+- generated lane geometry through curves, merges, ramps, and intersections.
 
 Measure:
 - time to first map frame;
