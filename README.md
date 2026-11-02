@@ -82,7 +82,7 @@ docs/                        Product and technical specifications
 Requirements:
 
 - JDK 17 or newer.
-- Android SDK with API 36 platform and Android build tools 36.0.0.
+- Android SDK with API 37.1 platform and Android build tools 36.0.0.
 - Internet access for the first dependency and Gradle distribution download.
 
 On Linux or macOS:
