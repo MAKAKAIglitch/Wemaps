@@ -38,9 +38,9 @@ For the first visible map prototype, use a dark navy/blue-grey palette inspired 
 | text.primary | #E8F0F7 | Primary labels |
 | text.secondary | #AFC1D0 | Secondary labels |
 
-These are editable starting values chosen to approximate a Waze-like dark visual direction. They are not extracted official Waze constants. Every color must live in a central style-token configuration, not be hard-coded across map layers or UI code.
+These are editable starting values chosen to approximate a Waze-like dark visual direction. They are not extracted official Waze constants. Every color must live in a central style-token configuration, not be hard-coded across map layers or UI code. The initial editable preset file is [`design/map-style-presets.json`](../design/map-style-presets.json).
 
-Keep the previous Violet Night palette as a separately named, switchable preset for future use. The style architecture must support named presets and custom token overrides. A later map-appearance editor should let users change road, background, route, building, and lane colors without changing rendering logic.
+Keep the previous Violet Night palette as a separately named, switchable preset for future use. The style architecture must support named presets and custom token overrides. A later in-app map-appearance editor should let users change road, background, route, building, and lane colors without changing rendering logic. Custom overrides should be stored locally in app settings.
 
 The palette is not an accessibility certification. Test contrast, color vision accessibility, and legibility on real devices in daylight and at night.
 
