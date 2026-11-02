@@ -81,7 +81,7 @@ docs/                        Product and technical specifications
 
 Requirements:
 
-- JDK 17.
+- JDK 17 or newer.
 - Android SDK with API 36 platform and Android build tools 36.0.0.
 - Internet access for the first dependency and Gradle distribution download.
 
@@ -97,7 +97,9 @@ On Windows:
 gradlew.bat :app:assembleDebug
 ```
 
-The small project launcher downloads the pinned Gradle distribution and verifies its SHA-256 checksum before running it. Android Studio can also open the repository as a Gradle project.
+The Windows launcher automatically searches for a compatible JDK in `JAVA_HOME`, `JDK_HOME`, `PATH`, Android Studio's bundled JBR, JetBrains-managed JDKs, and common installation folders. A JDK 17 or newer must already be installed; setting `JAVA_HOME` manually is usually unnecessary. The launcher also downloads the pinned Gradle distribution and verifies its SHA-256 checksum before running it.
+
+Android Studio can also open the repository as a Gradle project.
 
 The current demo camera starts in a neutral sample area until device-location support is implemented. No location permission is requested by the initial map shell.
 
