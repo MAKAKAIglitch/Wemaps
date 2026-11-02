@@ -26,8 +26,8 @@
 | road.secondary | #A18BC9 | Secondary roads |
 | road.primary | #B99CEB | Primary roads |
 | road.major | #D1B7FF | Major roads |
-| building.side | #29213B | Building side faces |
-| building.roof | #3A2E50 | Building roofs |
+| building.side | #342842 | Building footprint / outline |
+| building.roof | #51436A | Building extrusion |
 | route.outline | #7139BA | Route casing |
 | route.main | #D18AFF | Route line |
 | route.highlight | #F4DEFF | Route highlight |
@@ -81,9 +81,9 @@ Use MapLibre Native Android for GPU-accelerated vector map rendering.
 ### Buildings
 
 - Render building footprints as extruded 3D volumes.
-- Use explicit height attributes where available, such as building height and levels.
-- Do not claim an estimated height is surveyed or authoritative.
-- If a fallback height is used for visual continuity, keep it clearly treated as an estimate in the rendering pipeline.
+- Use the vector tile's mapped building height attributes (for example, render_height and render_min_height) without an arbitrary visual height multiplier.
+- In OpenMapTiles, render_height may be derived from explicit height or building levels; do not claim a derived value is surveyed or authoritative.
+- Do not invent a generic building height when the source contains no usable height value.
 - Reduce detail when zoomed out to avoid visual clutter.
 - Avoid making buildings obscure road geometry, route guidance, or important labels.
 
@@ -98,6 +98,23 @@ Use MapLibre Native Android for GPU-accelerated vector map rendering.
 ### Road hierarchy
 
 Road class must be communicated through a combination of line width, contrast, casing, and color. The route should be visually dominant without hiding intersections or road geometry.
+
+### Road depth and markings
+
+- Give road classes separate widths derived from the OSM-derived transportation class and current zoom.
+- Build visual depth with a darker offset shadow, a thicker casing, and a restrained top highlight.
+- Show dashed lane-like markings only at close zoom on major road classes.
+- Treat these markings as cartographic styling until the chosen tile source exposes reliable lane counts and lane geometry. Do not claim that a decorative dashed line represents every real lane.
+- Preserve road class hierarchy and avoid making local streets visually compete with motorways.
+
+### Land cover and vegetation
+
+- Give mapped beaches and sand a dark sand-gold palette.
+- Keep woodland and park fills distinct.
+- Show small repeated canopy symbols only at close zoom (around z15.5 and above).
+- Use species-specific conifer or broadleaf symbols only when the actual source data exposes the corresponding vegetation attributes.
+- A generic woodland pattern must not be presented as a verified inventory of individual trees or species.
+
 
 ## 5. Navigation screen
 
