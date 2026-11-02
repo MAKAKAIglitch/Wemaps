@@ -44,7 +44,22 @@ When using its published styles and tiles, preserve the attribution required by 
 
 MapLibre may display style attribution automatically, but the app must verify that it is actually visible in the final UI.
 
-## 5. Speed-camera and road-sign data
+## 5. OSM road-detail overlay
+
+The current close-zoom lane-divider prototype requests OSM way geometry and tags from the public Overpass API:
+
+- Endpoint: https://overpass-api.de/api/interpreter
+- Query area: the visible map bounding box only, at zoom 15.5 and closer.
+- Queried tags include `lanes`, `lanes:forward`, `lanes:backward`, `lane_markings`, `turn:lanes` and their directional variants.
+- Requests are rate-limited and performed away from the Android UI thread.
+- The request sends the visible geographic bounding box to Overpass. It does not send the device's raw location as a separate profile field or store a location history.
+
+The overlay depends on a community-operated public endpoint. It can be slow, rate-limited, or unavailable; the base map remains usable when that happens. Review the [Overpass API documentation](https://wiki.openstreetmap.org/wiki/Overpass_API) and [public instance usage guidance](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html) before increasing request frequency or production traffic.
+
+Lane values and geometry remain OpenStreetMap data under ODbL and require the same attribution. The app's generated offsets are Wemaps rendering output and must not be presented as exact survey-grade painted-marking geometry.
+
+## 6. Speed-camera and road-sign data
+
 
 Relevant OpenStreetMap references:
 
