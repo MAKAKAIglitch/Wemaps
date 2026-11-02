@@ -28,7 +28,7 @@ button,input{font:inherit} button{cursor:pointer}
 .color-row input[type=color]::-webkit-color-swatch-wrapper{padding:0}.color-row input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
 .color-row code{color:#817491;font-size:9px;text-align:right}
 .range-control{margin-top:13px}.range-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;color:#c8bbd9;font-size:10px}
-.range-label output{color:#d5a4ff;font-variant-numeric:tabular-nums;font-size:10px}
+.range-label output{color:#d5a4ff;font-variant-numeric:tabular-nums;font-size:10px}.control-hint{color:#786b89;font-size:9px;line-height:1.4;margin-top:8px}
 input[type=range]{appearance:none;width:100%;height:4px;border-radius:10px;background:#382b49;outline:none;display:block}
 input[type=range]::-webkit-slider-thumb{appearance:none;width:13px;height:13px;background:#d18aff;border:2px solid #f5eaff;border-radius:50%;box-shadow:0 0 0 3px rgba(209,138,255,.14)}
 input[type=range]::-moz-range-thumb{width:10px;height:10px;background:#d18aff;border:2px solid #f5eaff;border-radius:50%}
