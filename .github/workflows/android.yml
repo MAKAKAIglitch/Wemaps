@@ -27,7 +27,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($file in (Get-ChildItem windows-build -Filter '*.ps1' -File)) {
+          $PowerShellFiles = @(Get-ChildItem windows-build -Filter '*.ps1' -File) + @(Get-Item gradlew.ps1)
+          foreach ($file in $PowerShellFiles) {
             $tokens = $null
             $parseErrors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors)
@@ -117,6 +118,7 @@ jobs:
           $env:ANDROID_HOME = ""
           $env:ANDROID_SDK_ROOT = ""
           $env:CI = "true"
+          $env:WEMAPS_NO_PAUSE = "1"
 
           $probeProject = Join-Path $fakeProfile "AndroidStudioProjects\SdkProbe"
           $fakePlatform = Join-Path $fakeSdk "platforms\android-37.1"
@@ -170,10 +172,11 @@ jobs:
             if ($actualSdkLine -ne $expectedSdkLine) {
               throw "The builder did not persist the resolved SDK path into local.properties"
             }
-            if (-not (Test-Path "Wemaps-debug.apk")) {
-              throw "The builder did not copy the APK into the project root"
+            $builtApk = Join-Path "dist" "Wemaps-debug.apk"
+            if (-not (Test-Path $builtApk)) {
+              throw "The builder did not copy the APK into dist"
             }
-            if ((Get-Content "Wemaps-debug.apk" -Raw) -ne "Wemaps Windows builder smoke test") {
+            if ((Get-Content $builtApk -Raw) -ne "Wemaps Windows builder smoke test") {
               throw "The copied APK content does not match the test APK"
             }
 
