@@ -163,6 +163,13 @@ jobs:
             if ($output -notmatch [regex]::Escape($fakeSdk)) {
               throw "SDK path from another project's local.properties was not detected"
             }
+            $expectedSdkLine = "sdk.dir=" + $fakeSdk.Replace('\', '\\')
+            $actualSdkLine = Get-Content "local.properties" |
+              Where-Object { $_ -match '^\s*sdk\.dir\s*=' } |
+              Select-Object -First 1
+            if ($actualSdkLine -ne $expectedSdkLine) {
+              throw "The builder did not persist the resolved SDK path into local.properties"
+            }
             if (-not (Test-Path "Wemaps-debug.apk")) {
               throw "The builder did not copy the APK into the project root"
             }
