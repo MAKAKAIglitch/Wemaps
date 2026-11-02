@@ -139,7 +139,7 @@ jobs:
             $occupiedDrives -notcontains ("$_" + ":\")
           } | Select-Object -First 1
           if (-not $missingDrive) { throw "Could not find an unused drive letter for stale-PATH regression test." }
-          $stalePathEntry = "$missingDrive" + ":stale-jdkin"
+          $stalePathEntry = "$missingDrive" + ":\stale-jdk\bin"
           $env:PATH = "$stalePathEntry;$env:PATH"
           Write-Host "Testing Java discovery with an unavailable drive in PATH: $stalePathEntry"
 
