@@ -82,7 +82,7 @@ docs/                        Спецификации и архитектура
 Требования:
 
 - JDK 17.
-- Android SDK с платформой API 37 и Android Build Tools 36.0.0.
+- Android SDK с платформой API 36 и Android Build Tools 36.0.0.
 - Интернет для первой загрузки Gradle и зависимостей.
 
 Linux / macOS:
