@@ -802,12 +802,15 @@
     const automatic2D = getVisibleWidthKm(zoom) > AUTO_2D_WIDTH_KM;
     const targetPitch = automatic2D ? 0 : preferredPitch;
 
-    map.easeTo({
-      pitch: targetPitch,
-      zoom,
-      duration: animate ? 520 : 0,
-      easing: EASE_IN_OUT_CUBIC
-    });
+    const cameraOptions = { pitch: targetPitch, zoom };
+    if (animate) {
+      map.easeTo(Object.assign(cameraOptions, {
+        duration: 520,
+        easing: EASE_IN_OUT_CUBIC
+      }));
+    } else {
+      map.jumpTo(cameraOptions);
+    }
 
     $("#pitchValue").textContent = automatic2D
       ? "0° · авто"
