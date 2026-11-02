@@ -662,7 +662,7 @@
             18, 1.05
           ],
           "line-opacity": 0.58,
-          "line-dasharray": [2, 3],
+          "line-dasharray": ["literal", [2, 3]],
           "line-blur": 0.1
         }
       }, symbolBefore);
