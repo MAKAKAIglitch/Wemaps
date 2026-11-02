@@ -1,7 +1,10 @@
 (() => {
   "use strict";
 
-  const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
+  const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+  const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+  const CAMERA_MIN_ZOOM = 11.5;
+  const CAMERA_MAX_BBOX_AREA = 0.42;
   const CENTER = [13.405, 52.52];
   const DEFAULT_PITCH = 73;
   const AUTO_2D_WIDTH_KM = 5;
@@ -92,6 +95,10 @@
   let interruptedResponseRetries = 0;
   let networkRetryTimer = null;
   let activeStyleDefinition = STYLE_URL;
+  let osmRequestController = null;
+  let osmRequestTimer = null;
+  let osmRequestSerial = 0;
+  let overlayClickHandlersBound = false;
 
   function setStatus(text) {
     statusNode.textContent = text;
@@ -384,68 +391,87 @@
     });
   }
 
-  function roadWidthExpression(multiplier = 1, extra = 0) {
-    const stops = [
-      {
-        zoom: 9,
-        values: { motorway: 1.6, trunk: 1.4, primary: 1.15, secondary: 0.95, tertiary: 0.75, minor: 0.55, service: 0.4, track: 0.35, path: 0.3, pedestrian: 0.3, fallback: 0.45 }
-      },
-      {
-        zoom: 12,
-        values: { motorway: 3.7, trunk: 3.3, primary: 2.9, secondary: 2.5, tertiary: 2.1, minor: 1.55, service: 1.1, track: 0.85, path: 0.65, pedestrian: 0.6, fallback: 0.8 }
-      },
-      {
-        zoom: 15,
-        values: { motorway: 8.0, trunk: 7.0, primary: 6.1, secondary: 5.2, tertiary: 4.3, minor: 3.15, service: 2.2, track: 1.55, path: 1.15, pedestrian: 1.0, fallback: 1.3 }
-      },
-      {
-        zoom: 18,
-        values: { motorway: 14.0, trunk: 12.4, primary: 10.8, secondary: 9.1, tertiary: 7.5, minor: 5.7, service: 4.0, track: 2.8, path: 2.0, pedestrian: 1.7, fallback: 2.2 }
-      }
+  function roadLaneCountExpression() {
+    return [
+      "case",
+      ["has", "lanes"],
+      ["to-number", ["get", "lanes"], 0],
+      ["any", ["has", "lanes:forward"], ["has", "lanes:backward"]],
+      [
+        "+",
+        ["to-number", ["get", "lanes:forward"], 0],
+        ["to-number", ["get", "lanes:backward"], 0]
+      ],
+      ["match", ["get", "class"],
+        "motorway", 4,
+        "trunk", 2,
+        "primary", 2,
+        "secondary", 2,
+        "tertiary", 2,
+        "minor", 2,
+        0
+      ]
+    ];
+  }
+
+  function roadWidthExpression(multiplier = 1, extraMeters = 0) {
+    const lanes = roadLaneCountExpression();
+    const hasLaneTags = [
+      "any",
+      ["has", "lanes"],
+      ["has", "lanes:forward"],
+      ["has", "lanes:backward"]
+    ];
+    const widthTag = ["to-number", ["get", "width"], 0];
+    const validWidthTag = ["all", ["has", "width"], [">", widthTag, 0]];
+    const shoulder = [
+      "match", ["get", "class"],
+      "motorway", 2.4,
+      "trunk", 1.8,
+      "primary", 1.3,
+      "secondary", 0.9,
+      "tertiary", 0.5,
+      "minor", 0.35,
+      0.15
+    ];
+    const laneWidthMeters = [
+      "+",
+      ["*", ["max", 1, ["min", 12, lanes]], 3.25],
+      shoulder
+    ];
+    const classWidthMeters = [
+      "match", ["get", "class"],
+      "motorway", 12.5,
+      "trunk", 10.5,
+      "primary", 9.5,
+      "secondary", 8.2,
+      "tertiary", 7.2,
+      "minor", 6.4,
+      "service", 4.6,
+      "track", 3.6,
+      "path", 2.0,
+      "pedestrian", 3.2,
+      5.0
+    ];
+    const realWorldWidthMeters = [
+      "case",
+      validWidthTag, widthTag,
+      ["all", hasLaneTags, [">", lanes, 0]], laneWidthMeters,
+      classWidthMeters
     ];
 
-    const lanePixelsByZoom = { 9: 0.55, 12: 1.4, 15: 2.8, 18: 4.2 };
-    const expression = ["interpolate", ["linear"], ["zoom"]];
-    stops.forEach((stop) => {
-      const values = {};
-      Object.keys(stop.values).forEach((key) => {
-        values[key] = Math.max(0.25, stop.values[key] * roadWidthScale * multiplier + extra);
-      });
+    const latitude = map ? map.getCenter().lat : 52.52;
+    const circumference = 40075016.68557849 * Math.max(0.087, Math.cos(latitude * Math.PI / 180));
+    const scaleStops = ["interpolate", ["exponential", 2], ["zoom"]];
+    for (let zoom = 5; zoom <= 20; zoom += 1) {
+      scaleStops.push(zoom, (512 * Math.pow(2, zoom)) / circumference);
+    }
 
-      const classWidth = makeClassMatch(values);
-      const laneCount = [
-        "coalesce",
-        ["to-number", ["get", "lanes"]],
-        [
-          "+",
-          ["to-number", ["get", "lanes:forward"], 0],
-          ["to-number", ["get", "lanes:backward"], 0]
-        ],
-        0
-      ];
-      const widthFromLaneTags = [
-        "+",
-        [
-          "*",
-          ["max", 1, ["min", 10, laneCount]],
-          lanePixelsByZoom[stop.zoom] * roadWidthScale * multiplier
-        ],
-        extra
-      ];
-      const hasLaneTags = [
-        "any",
-        ["has", "lanes"],
-        ["has", "lanes:forward"],
-        ["has", "lanes:backward"]
-      ];
-      expression.push(stop.zoom, [
-        "case",
-        hasLaneTags,
-        ["max", classWidth, widthFromLaneTags],
-        classWidth
-      ]);
-    });
-    return expression;
+    return [
+      "*",
+      ["+", ["*", realWorldWidthMeters, multiplier], extraMeters],
+      scaleStops
+    ];
   }
 
   function refreshLayerCache() {
@@ -595,19 +621,37 @@
     const footprint = style.layers.find((layer) => (
       layer["source-layer"] === "building" && layer.type === "fill"
     ));
-    if (!footprint) return;
+    const vectorSource = Object.entries(style.sources || {}).find(([id, source]) => (
+      source && source.type === "vector" && (id === "openmaptiles" || /planet|openfreemap/i.test(source.url || ""))
+    )) || Object.entries(style.sources || {}).find(([, source]) => source && source.type === "vector");
+
+    const sourceId = footprint ? footprint.source : (vectorSource ? vectorSource[0] : null);
+    if (!sourceId) {
+      console.warn("No vector source available for the OpenMapTiles building layer.");
+      return;
+    }
 
     let extrusions = findExtrusionLayers();
     if (!extrusions.length) {
-      const footprintIndex = style.layers.findIndex((layer) => layer.id === footprint.id);
-      const nextLayer = style.layers[footprintIndex + 1];
+      let beforeId;
+      if (footprint) {
+        const footprintIndex = style.layers.findIndex((layer) => layer.id === footprint.id);
+        beforeId = style.layers[footprintIndex + 1]?.id;
+      } else {
+        beforeId = style.layers.find((layer) => layer.type === "symbol")?.id;
+      }
+
       map.addLayer({
         id: "wemaps-building-3d",
         type: "fill-extrusion",
-        source: footprint.source,
+        source: sourceId,
         "source-layer": "building",
-        minzoom: 14,
-        filter: ["!", ["to-boolean", ["get", "hide_3d"]]],
+        minzoom: 13.5,
+        filter: [
+          "all",
+          ["!", ["to-boolean", ["get", "hide_3d"]]],
+          [">", ["to-number", ["coalesce", ["get", "render_height"], ["get", "height"]], 0], 0]
+        ],
         paint: {
           "fill-extrusion-base": ["coalesce", ["to-number", ["get", "render_min_height"]], 0],
           "fill-extrusion-height": [
@@ -616,24 +660,22 @@
             ["to-number", ["get", "height"]],
             0
           ],
-          "fill-extrusion-color": [
-            "coalesce",
-            ["get", "colour"],
-            readPalette().buildingRoof
-          ],
+          "fill-extrusion-color": ["coalesce", ["get", "colour"], readPalette().buildingRoof],
           "fill-extrusion-opacity": buildingOpacity,
           "fill-extrusion-vertical-gradient": true
         }
-      }, nextLayer ? nextLayer.id : undefined);
+      }, beforeId);
       extrusions = findExtrusionLayers();
     }
 
     extrusions.forEach((layer) => {
-      map.setFilter(layer.id, ["!", ["to-boolean", ["get", "hide_3d"]]]);
+      map.setFilter(layer.id, [
+        "all",
+        ["!", ["to-boolean", ["get", "hide_3d"]]],
+        [">", ["to-number", ["coalesce", ["get", "render_height"], ["get", "height"]], 0], 0]
+      ]);
       map.setPaintProperty(layer.id, "fill-extrusion-base", [
-        "coalesce",
-        ["to-number", ["get", "render_min_height"]],
-        0
+        "coalesce", ["to-number", ["get", "render_min_height"]], 0
       ]);
       map.setPaintProperty(layer.id, "fill-extrusion-height", [
         "coalesce",
@@ -642,11 +684,9 @@
         0
       ]);
       map.setPaintProperty(layer.id, "fill-extrusion-color", [
-        "coalesce",
-        ["get", "colour"],
-        readPalette().buildingRoof
+        "coalesce", ["get", "colour"], readPalette().buildingRoof
       ]);
-      map.setPaintProperty(layer.id, "fill-extrusion-opacity", buildingOpacity);
+      map.setPaintProperty(layer.id, "fill-extrusion-opacity", currentExtrusionOpacity);
       map.setPaintProperty(layer.id, "fill-extrusion-vertical-gradient", true);
     });
   }
@@ -724,12 +764,11 @@
     const road = getVectorSourceForLayer("transportation", "line");
     if (!road) return;
 
-    const styleLayers = map.getStyle().layers;
-    const firstRoad = styleLayers.find((layer) => (
-      layer["source-layer"] === "transportation" && layer.type === "line"
-    ));
-    const firstSymbol = styleLayers.find((layer) => layer.type === "symbol");
+    const firstSymbol = map.getStyle().layers.find((layer) => layer.type === "symbol");
     const symbolBefore = firstSymbol ? firstSymbol.id : undefined;
+    const baseFilter = roadFilter();
+    const bridgeFilter = ["all", baseFilter, ["==", ["get", "brunnel"], "bridge"]];
+    const rampFilter = ["all", baseFilter, ["==", ["get", "ramp"], 1]];
 
     if (!map.getLayer("wemaps-road-depth-shadow")) {
       map.addLayer({
@@ -738,20 +777,17 @@
         source: road.source,
         "source-layer": road.sourceLayer,
         minzoom: 9.5,
-        filter: roadFilter(),
-        layout: {
-          "line-cap": "round",
-          "line-join": "round"
-        },
+        filter: baseFilter,
+        layout: { "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": "#080610",
-          "line-width": roadWidthExpression(1.7, 2.0),
-          "line-opacity": 0.58,
-          "line-blur": 1.6,
+          "line-width": roadWidthExpression(1.42, 1.6),
+          "line-opacity": 0.62,
+          "line-blur": 1.1,
           "line-translate": [0, 1.8],
           "line-translate-anchor": "viewport"
         }
-      }, firstRoad ? firstRoad.id : undefined);
+      }, symbolBefore);
     }
 
     if (!map.getLayer("wemaps-road-top-sheen")) {
@@ -761,114 +797,536 @@
         source: road.source,
         "source-layer": road.sourceLayer,
         minzoom: 12.5,
-        filter: roadFilter(),
-        layout: {
-          "line-cap": "round",
-          "line-join": "round"
-        },
+        filter: baseFilter,
+        layout: { "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": "#f7eaff",
-          "line-width": roadWidthExpression(0.33, 0),
-          "line-opacity": 0.23,
-          "line-blur": 0.25
+          "line-width": roadWidthExpression(0.28, 0),
+          "line-opacity": 0.2,
+          "line-blur": 0.2
         }
       }, symbolBefore);
     }
 
-    const laneCountExpression = [
-      "case",
-      ["has", "lanes"],
-      ["to-number", ["get", "lanes"], 0],
-      ["any", ["has", "lanes:forward"], ["has", "lanes:backward"]],
-      [
-        "+",
-        ["to-number", ["get", "lanes:forward"], 0],
-        ["to-number", ["get", "lanes:backward"], 0]
-      ],
-      ["match", ["get", "class"],
-        "motorway", 4,
-        "trunk", 2,
-        "primary", 2,
-        "secondary", 2,
-        "tertiary", 2,
-        0
-      ]
-    ];
-    const laneRoadFilter = [
-      "all",
-      ["in", ["get", "class"], ["literal", [
-        "motorway", "trunk", "primary", "secondary", "tertiary", "minor"
-      ]]],
-      [">=", laneCountExpression, 2],
-      ["!=", ["get", "brunnel"], "tunnel"]
-    ];
-    const multilaneRoadFilter = [
-      "all",
-      ["in", ["get", "class"], ["literal", [
-        "motorway", "trunk", "primary", "secondary"
-      ]]],
-      [">=", laneCountExpression, 3],
-      ["!=", ["get", "brunnel"], "tunnel"]
-    ];
+    if (!map.getLayer("wemaps-bridge-shadow")) {
+      map.addLayer({
+        id: "wemaps-bridge-shadow",
+        type: "line",
+        source: road.source,
+        "source-layer": road.sourceLayer,
+        minzoom: 10.5,
+        filter: bridgeFilter,
+        layout: { "line-cap": "butt", "line-join": "round" },
+        paint: {
+          "line-color": "#07050d",
+          "line-width": roadWidthExpression(1.42, 2.0),
+          "line-opacity": 0.9,
+          "line-translate": [0, 3.2],
+          "line-translate-anchor": "viewport",
+          "line-blur": 0.9
+        }
+      }, symbolBefore);
+    }
+
+    if (!map.getLayer("wemaps-bridge-deck-edge")) {
+      map.addLayer({
+        id: "wemaps-bridge-deck-edge",
+        type: "line",
+        source: road.source,
+        "source-layer": road.sourceLayer,
+        minzoom: 11,
+        filter: bridgeFilter,
+        layout: { "line-cap": "butt", "line-join": "round" },
+        paint: {
+          "line-color": "#2b203a",
+          "line-width": roadWidthExpression(1.12, 0.8),
+          "line-opacity": 0.96
+        }
+      }, symbolBefore);
+    }
+
+    if (!map.getLayer("wemaps-bridge-deck-sheen")) {
+      map.addLayer({
+        id: "wemaps-bridge-deck-sheen",
+        type: "line",
+        source: road.source,
+        "source-layer": road.sourceLayer,
+        minzoom: 12,
+        filter: bridgeFilter,
+        layout: { "line-cap": "butt", "line-join": "round" },
+        paint: {
+          "line-color": "#d9c0f6",
+          "line-width": roadWidthExpression(0.82, 0),
+          "line-opacity": 0.25,
+          "line-blur": 0.15
+        }
+      }, symbolBefore);
+    }
+
+    if (!map.getLayer("wemaps-ramp-highlight")) {
+      map.addLayer({
+        id: "wemaps-ramp-highlight",
+        type: "line",
+        source: road.source,
+        "source-layer": road.sourceLayer,
+        minzoom: 11.5,
+        filter: rampFilter,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": "#dfc0ff",
+          "line-width": roadWidthExpression(1.02, 0.15),
+          "line-opacity": 0.32,
+          "line-blur": 0.35
+        }
+      }, symbolBefore);
+    }
+
+    const laneCountExpression = roadLaneCountExpression();
+    const laneClasses = ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"];
     const laneLineWidth = [
       "interpolate", ["linear"], ["zoom"],
-      14.5, 0.55,
-      16, 0.82,
-      18, 1.15
+      14.5, 0.45,
+      16, 0.7,
+      18, 0.95
     ];
 
-    if (!map.getLayer("wemaps-road-lane-markings")) {
-      map.addLayer({
-        id: "wemaps-road-lane-markings",
-        type: "line",
-        source: road.source,
-        "source-layer": road.sourceLayer,
-        minzoom: 14.5,
-        filter: laneRoadFilter,
-        layout: {
-          "line-cap": "butt",
-          "line-join": "round"
-        },
-        paint: {
-          "line-color": "#f4e9ff",
-          "line-width": laneLineWidth,
-          "line-opacity": 0.82,
-          "line-dasharray": ["literal", [3, 3]],
-          "line-blur": 0.05
-        }
-      }, symbolBefore);
+    for (let lanes = 2; lanes <= 6; lanes += 1) {
+      for (let divider = 1; divider < lanes; divider += 1) {
+        const id = "wemaps-road-lanes-" + lanes + "-" + divider;
+        if (map.getLayer(id)) continue;
+        const offsetRatio = divider / lanes - 0.5;
+        map.addLayer({
+          id,
+          type: "line",
+          source: road.source,
+          "source-layer": road.sourceLayer,
+          minzoom: 14.5,
+          filter: [
+            "all",
+            ["in", ["get", "class"], ["literal", laneClasses]],
+            ["==", laneCountExpression, lanes],
+            ["!=", ["get", "brunnel"], "tunnel"]
+          ],
+          layout: { "line-cap": "butt", "line-join": "round" },
+          paint: {
+            "line-color": "#f2e7ff",
+            "line-width": laneLineWidth,
+            "line-offset": ["*", roadWidthExpression(1, 0), offsetRatio],
+            "line-opacity": 0.76,
+            "line-dasharray": ["literal", [2.4, 2.8]],
+            "line-blur": 0.04
+          }
+        }, symbolBefore);
+      }
+    }
+  }
+
+  function parseBearing(value) {
+    if (value === undefined || value === null) return null;
+    const raw = String(value).trim().toUpperCase();
+    const numeric = Number(raw.replace(/[°º]/g, ""));
+    if (raw !== "" && Number.isFinite(numeric)) return ((numeric % 360) + 360) % 360;
+    const compass = {
+      N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5,
+      SE: 135, SSE: 157.5, S: 180, SSW: 202.5, SW: 225,
+      WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5
+    };
+    return Object.prototype.hasOwnProperty.call(compass, raw) ? compass[raw] : null;
+  }
+
+  function destinationPoint(lon, lat, bearing, distanceMeters) {
+    const earthRadius = 6371008.8;
+    const angularDistance = distanceMeters / earthRadius;
+    const theta = bearing * Math.PI / 180;
+    const phi1 = lat * Math.PI / 180;
+    const lambda1 = lon * Math.PI / 180;
+    const sinPhi2 = Math.sin(phi1) * Math.cos(angularDistance)
+      + Math.cos(phi1) * Math.sin(angularDistance) * Math.cos(theta);
+    const phi2 = Math.asin(Math.max(-1, Math.min(1, sinPhi2)));
+    const lambda2 = lambda1 + Math.atan2(
+      Math.sin(theta) * Math.sin(angularDistance) * Math.cos(phi1),
+      Math.cos(angularDistance) - Math.sin(phi1) * Math.sin(phi2)
+    );
+    return [((lambda2 * 180 / Math.PI + 540) % 360) - 180, phi2 * 180 / Math.PI];
+  }
+
+  function makeCameraSector(lon, lat, bearing, properties) {
+    const points = [[lon, lat]];
+    for (let angle = bearing - 18; angle <= bearing + 18.01; angle += 3) {
+      points.push(destinationPoint(lon, lat, angle, 72));
+    }
+    points.push([lon, lat]);
+    return {
+      type: "Feature",
+      properties: Object.assign({}, properties, { kind: "camera-sector" }),
+      geometry: { type: "Polygon", coordinates: [points] }
+    };
+  }
+
+  function makeOverlayIcon(kind) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    if (kind === "camera") {
+      ctx.shadowColor = "rgba(0,0,0,.65)";
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = "#21142c";
+      ctx.beginPath();
+      ctx.arc(32, 34, 23, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "#ff9b83";
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+      ctx.fillStyle = "#f5c1ff";
+      ctx.beginPath();
+      ctx.moveTo(32, 5);
+      ctx.lineTo(22, 26);
+      ctx.lineTo(42, 26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fff4ff";
+      ctx.beginPath();
+      ctx.arc(32, 38, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#9a63be";
+      ctx.beginPath();
+      ctx.arc(32, 38, 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.shadowColor = "rgba(0,0,0,.65)";
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = "#392347";
+      ctx.beginPath();
+      ctx.arc(32, 32, 21, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "#ffca75";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = "#fff0c5";
+      ctx.beginPath();
+      ctx.moveTo(32, 12);
+      ctx.lineTo(43, 32);
+      ctx.lineTo(32, 26);
+      ctx.lineTo(21, 32);
+      ctx.closePath();
+      ctx.fill();
+    }
+    return canvas;
+  }
+
+  function registerOverlayImages() {
+    if (!map.hasImage("wemaps-speed-camera")) {
+      map.addImage("wemaps-speed-camera", makeOverlayIcon("camera"), { pixelRatio: 2 });
+    }
+    if (!map.hasImage("wemaps-junction-marker")) {
+      map.addImage("wemaps-junction-marker", makeOverlayIcon("junction"), { pixelRatio: 2 });
+    }
+  }
+
+  function makeOverlayPopup(title, rows) {
+    const root = document.createElement("div");
+    root.className = "wemaps-popup";
+    const heading = document.createElement("strong");
+    heading.textContent = title;
+    root.appendChild(heading);
+    rows.filter((row) => row && row.value !== undefined && row.value !== "").forEach((row) => {
+      const line = document.createElement("div");
+      line.textContent = row.label + ": " + row.value;
+      root.appendChild(line);
+    });
+    return root;
+  }
+
+  function bindOverlayClickHandlers() {
+    if (overlayClickHandlersBound) return;
+    overlayClickHandlersBound = true;
+
+    map.on("click", "wemaps-camera-symbols", (event) => {
+      const feature = event.features && event.features[0];
+      if (!feature) return;
+      const props = feature.properties || {};
+      const rows = [
+        { label: "Тип", value: props.cameraType },
+        { label: "Скорость", value: props.maxspeed ? props.maxspeed + " км/ч" : "" },
+        { label: "Направление", value: props.directionKnown === "yes" ? props.direction + "° от севера" : "не указано в OSM" },
+        { label: "Объект OSM", value: props.osmId }
+      ];
+      new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+        .setLngLat(event.lngLat)
+        .setDOMContent(makeOverlayPopup("Камера", rows))
+        .addTo(map);
+    });
+
+    map.on("click", "wemaps-junction-symbols", (event) => {
+      const feature = event.features && event.features[0];
+      if (!feature) return;
+      const props = feature.properties || {};
+      new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+        .setLngLat(event.lngLat)
+        .setDOMContent(makeOverlayPopup("Авторазвязка / съезд", [
+          { label: "Номер", value: props.ref },
+          { label: "Название", value: props.name },
+          { label: "Объект OSM", value: props.osmId }
+        ]))
+        .addTo(map);
+    });
+  }
+
+  function ensureOsmOverlayLayers() {
+    registerOverlayImages();
+    if (!map.getSource("wemaps-osm-live")) {
+      map.addSource("wemaps-osm-live", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] }
+      });
     }
 
-    [-1, 1].forEach((side) => {
-      const id = side < 0
-        ? "wemaps-road-lane-divider-left"
-        : "wemaps-road-lane-divider-right";
-      if (map.getLayer(id)) return;
+    const beforeId = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+    const source = "wemaps-osm-live";
+
+    if (!map.getLayer("wemaps-camera-view-cones")) {
       map.addLayer({
-        id,
-        type: "line",
-        source: road.source,
-        "source-layer": road.sourceLayer,
-        minzoom: 15.5,
-        filter: multilaneRoadFilter,
+        id: "wemaps-camera-view-cones",
+        type: "fill",
+        source,
+        filter: ["==", ["get", "kind"], "camera-sector"],
+        paint: {
+          "fill-color": "#ff9b83",
+          "fill-opacity": 0.2,
+          "fill-outline-color": "#ffd0a6"
+        }
+      }, beforeId);
+    }
+    if (!map.getLayer("wemaps-camera-points")) {
+      map.addLayer({
+        id: "wemaps-camera-points",
+        type: "circle",
+        source,
+        filter: ["==", ["get", "kind"], "camera"],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 11.5, 4.5, 16, 7.5, 19, 9],
+          "circle-color": "#28162f",
+          "circle-stroke-color": "#ffb09a",
+          "circle-stroke-width": 1.8,
+          "circle-opacity": 0.98
+        }
+      }, beforeId);
+    }
+    if (!map.getLayer("wemaps-camera-symbols")) {
+      map.addLayer({
+        id: "wemaps-camera-symbols",
+        type: "symbol",
+        source,
+        filter: ["==", ["get", "kind"], "camera"],
         layout: {
-          "line-cap": "butt",
-          "line-join": "round"
+          "icon-image": "wemaps-speed-camera",
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 11.5, 0.48, 16, 0.7, 19, 0.82],
+          "icon-rotate": ["to-number", ["get", "direction"], 0],
+          "icon-rotation-alignment": "map",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true
+        }
+      }, beforeId);
+    }
+    if (!map.getLayer("wemaps-junction-symbols")) {
+      map.addLayer({
+        id: "wemaps-junction-symbols",
+        type: "symbol",
+        source,
+        filter: ["==", ["get", "kind"], "junction"],
+        layout: {
+          "icon-image": "wemaps-junction-marker",
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 11.5, 0.42, 15, 0.65, 18, 0.78],
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "text-field": ["coalesce", ["get", "ref"], ["get", "name"], ""],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 10,
+          "text-offset": [0, 1.35],
+          "text-anchor": "top",
+          "text-allow-overlap": false
         },
         paint: {
-          "line-color": "#eadcff",
-          "line-width": [
-            "interpolate", ["linear"], ["zoom"],
-            15.5, 0.55,
-            18, 0.95
-          ],
-          "line-offset": ["*", roadWidthExpression(0.22, 0), side],
-          "line-opacity": 0.58,
-          "line-dasharray": ["literal", [2.5, 3.5]],
-          "line-blur": 0.08
+          "text-color": "#ffdc9e",
+          "text-halo-color": "#17101f",
+          "text-halo-width": 1.2
         }
-      }, symbolBefore);
+      }, beforeId);
+    }
+
+    bindOverlayClickHandlers();
+  }
+
+  function osmOverlayStatus(message) {
+    const node = document.querySelector("#mapFeatureStatus");
+    if (node) node.textContent = message;
+  }
+
+  function buildOsmOverlayFeatures(data) {
+    const features = [];
+    const seen = new Set();
+    let cameras = 0;
+    let junctions = 0;
+
+    (data.elements || []).forEach((element) => {
+      const tags = element.tags || {};
+      const id = element.type + "/" + element.id;
+      if (seen.has(id)) return;
+
+      const point = Number.isFinite(element.lat) && Number.isFinite(element.lon)
+        ? [element.lon, element.lat]
+        : (element.center && Number.isFinite(element.center.lon) && Number.isFinite(element.center.lat)
+          ? [element.center.lon, element.center.lat]
+          : null);
+      if (!point) return;
+
+      if (tags.highway === "motorway_junction") {
+        seen.add(id);
+        junctions += 1;
+        features.push({
+          type: "Feature",
+          properties: {
+            kind: "junction",
+            osmId: id,
+            ref: tags.ref || "",
+            name: tags.name || "",
+            destination: tags.destination || ""
+          },
+          geometry: { type: "Point", coordinates: point }
+        });
+        return;
+      }
+
+      const isSpeedCamera = tags.highway === "speed_camera";
+      const isTrafficSurveillance = tags.man_made === "surveillance"
+        && /^(camera|alpr)$/i.test(tags["surveillance:type"] || "")
+        && /^(traffic|road|street|motorway)$/i.test(tags["surveillance:zone"] || "");
+      if (!isSpeedCamera && !isTrafficSurveillance) return;
+
+      seen.add(id);
+      cameras += 1;
+      const bearing = parseBearing(tags["camera:direction"] || tags.direction);
+      const properties = {
+        kind: "camera",
+        osmId: id,
+        cameraType: isSpeedCamera ? "Контроль скорости" : "Дорожное наблюдение",
+        maxspeed: tags.maxspeed || "",
+        direction: bearing === null ? 0 : bearing,
+        directionKnown: bearing === null ? "no" : "yes",
+        name: tags.name || "",
+        operator: tags.operator || ""
+      };
+      features.push({
+        type: "Feature",
+        properties,
+        geometry: { type: "Point", coordinates: point }
+      });
+      if (bearing !== null) {
+        features.push(makeCameraSector(point[0], point[1], bearing, properties));
+      }
     });
+
+    return {
+      collection: { type: "FeatureCollection", features },
+      cameras,
+      junctions
+    };
+  }
+
+  async function fetchOsmOverlays() {
+    if (!map || !styleReady || !map.getSource("wemaps-osm-live")) return;
+    if (map.getZoom() < CAMERA_MIN_ZOOM) {
+      map.getSource("wemaps-osm-live").setData({ type: "FeatureCollection", features: [] });
+      osmOverlayStatus("Камеры и съезды OSM · приблизь карту");
+      return;
+    }
+
+    const bounds = map.getBounds();
+    const west = bounds.getWest();
+    const south = bounds.getSouth();
+    const east = bounds.getEast();
+    const north = bounds.getNorth();
+    const area = Math.abs((east - west) * (north - south));
+    if (area > CAMERA_MAX_BBOX_AREA) {
+      osmOverlayStatus("Камеры OSM · приблизь для загрузки");
+      return;
+    }
+
+    if (osmRequestController) osmRequestController.abort();
+    const controller = new AbortController();
+    osmRequestController = controller;
+    const serial = ++osmRequestSerial;
+    const bbox = [south, west, north, east].map((value) => value.toFixed(5)).join(",");
+    const query = [
+      "[out:json][timeout:20];",
+      "(",
+      'node["highway"="speed_camera"](' + bbox + ");",
+      'nwr["man_made"="surveillance"]["surveillance:type"~"^(camera|ALPR)$"]["surveillance:zone"~"^(traffic|road|street|motorway)$"](' + bbox + ");",
+      'node["highway"="motorway_junction"](' + bbox + ");",
+      ");out center tags;"
+    ].join("");
+
+    osmOverlayStatus("Камеры OSM · загрузка…");
+    try {
+      const response = await fetch(OVERPASS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: new URLSearchParams({ data: query }),
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error("Overpass HTTP " + response.status);
+      const data = await response.json();
+      if (controller.signal.aborted || serial !== osmRequestSerial) return;
+
+      const result = buildOsmOverlayFeatures(data);
+      const source = map.getSource("wemaps-osm-live");
+      if (source) source.setData(result.collection);
+      osmOverlayStatus("Камеры OSM: " + result.cameras + " · съезды: " + result.junctions);
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.warn("OpenStreetMap camera overlay:", error);
+      osmOverlayStatus("Камеры OSM · источник временно недоступен");
+    }
+  }
+
+  function scheduleOsmOverlayFetch() {
+    if (osmRequestTimer !== null) window.clearTimeout(osmRequestTimer);
+    osmRequestTimer = window.setTimeout(() => {
+      osmRequestTimer = null;
+      fetchOsmOverlays();
+    }, 550);
+  }
+
+  function refreshRoadWidthExpressions() {
+    if (!map || !layerCache) return;
+    layerCache.transportation.forEach((layer) => {
+      const id = String(layer.id || "").toLowerCase();
+      if (/rail|aerialway|ferry|transit|cable/.test(id)) return;
+      map.setPaintProperty(layer.id, "line-width", roadWidthExpression(id.includes("casing") ? 1.58 : 1));
+    });
+
+    const widthLayers = [
+      ["wemaps-road-depth-shadow", 1.42, 1.6],
+      ["wemaps-road-top-sheen", 0.28, 0],
+      ["wemaps-bridge-shadow", 1.42, 2],
+      ["wemaps-bridge-deck-edge", 1.12, 0.8],
+      ["wemaps-bridge-deck-sheen", 0.82, 0],
+      ["wemaps-ramp-highlight", 1.02, 0.15]
+    ];
+    widthLayers.forEach(([id, multiplier, extra]) => {
+      if (map.getLayer(id)) map.setPaintProperty(id, "line-width", roadWidthExpression(multiplier, extra));
+    });
+    for (let lanes = 2; lanes <= 6; lanes += 1) {
+      for (let divider = 1; divider < lanes; divider += 1) {
+        const id = "wemaps-road-lanes-" + lanes + "-" + divider;
+        if (map.getLayer(id)) {
+          map.setPaintProperty(id, "line-offset", ["*", roadWidthExpression(1, 0), divider / lanes - 0.5]);
+        }
+      }
+    }
   }
 
   function applyStyle() {
@@ -1168,17 +1626,34 @@
     map = new maplibregl.Map({
       container: "map",
       style: STYLE_URL,
+      transformStyle: (_previousStyle, nextStyle) => {
+        const transformed = JSON.parse(JSON.stringify(nextStyle));
+        transformed.layers = transformed.layers.map((layer) => {
+          if (layer.type === "background") {
+            layer.paint = Object.assign({}, layer.paint || {}, { "background-color": DEFAULTS.background });
+          }
+          return layer;
+        });
+        return transformed;
+      },
       center: CENTER,
       zoom: Number($("#zoom").value),
       pitch: 0,
       bearing: -18,
+      reduceMotion: false,
+      dragPan: {
+        linearity: 0.22,
+        easing: (t) => t * (2 - t),
+        maxSpeed: 1900,
+        deceleration: 1450
+      },
       maxPitch: 80,
       minZoom: 3,
       maxZoom: 20,
       attributionControl: true,
       renderWorldCopies: false,
-      fadeDuration: 240,
-      maxTileCacheZoomLevels: 5,
+      fadeDuration: 420,
+      maxTileCacheZoomLevels: 8,
       cancelPendingTileRequestsWhileZooming: false,
       localIdeographFontFamily: "sans-serif",
       canvasContextAttributes: {
@@ -1208,6 +1683,7 @@
       ensureBuildingLayer();
       ensureForestDetailLayers();
       ensureRoadDepthLayers();
+      ensureOsmOverlayLayers();
       refreshLayerCache();
       currentExtrusionOpacity = buildingOpacity;
       applyStyle();
@@ -1216,6 +1692,7 @@
       updateRoadControls();
 
       setStatus("Карта загружена · Violet Night");
+      scheduleOsmOverlayFetch();
     });
 
     map.on("zoomend", () => {
@@ -1226,7 +1703,14 @@
       saveSettings();
     });
 
-    map.on("resize", () => refreshAdaptiveCamera(false));
+    map.on("resize", () => {
+      refreshAdaptiveCamera(false);
+      refreshRoadWidthExpressions();
+    });
+    map.on("moveend", () => {
+      refreshRoadWidthExpressions();
+      scheduleOsmOverlayFetch();
+    });
     map.on("pitchend", () => refreshAdaptiveCamera(false));
 
     map.on("error", (event) => {
