@@ -89,6 +89,9 @@
   let extrusionFadeToken = 0;
   let styleLoadRetries = 0;
   let retryTimer = null;
+  let interruptedResponseRetries = 0;
+  let networkRetryTimer = null;
+  let activeStyleDefinition = STYLE_URL;
 
   function setStatus(text) {
     statusNode.textContent = text;
@@ -1059,6 +1062,7 @@
         if (style.version !== 8 || !Array.isArray(style.layers) || !style.sources) {
           throw new Error("Файл не похож на MapLibre Style JSON версии 8.");
         }
+        activeStyleDefinition = style;
         map.setStyle(style);
       } catch (error) {
         showError("Не удалось импортировать стиль: " + error.message);
@@ -1112,16 +1116,14 @@
     });
 
     $("#resetCamera").addEventListener("click", () => {
-      $("#zoom").value = 15.2;
+      const zoom = 15.2;
+      $("#zoom").value = zoom;
       $("#pitch").value = DEFAULT_PITCH;
       preferredPitch = DEFAULT_PITCH;
-      updateCamera(true);
-      map.easeTo({
-        center: CENTER,
-        bearing: -18,
-        duration: 650,
-        easing: EASE_IN_OUT_CUBIC
-      });
+      const targetPitch = getVisibleWidthKm(zoom) > AUTO_2D_WIDTH_KM ? 0 : preferredPitch;
+      $("#zoomValue").textContent = zoom.toFixed(1);
+      transitionCamera(targetPitch, zoom, { center: CENTER, bearing: -18 });
+      saveSettings();
     });
 
     $("#toggleBuildings").addEventListener("click", () => {
@@ -1143,15 +1145,9 @@
     });
 
     $("#recenter").addEventListener("click", () => {
-      const targetPitch = getVisibleWidthKm(15.2) > AUTO_2D_WIDTH_KM ? 0 : preferredPitch;
-      map.easeTo({
-        center: CENTER,
-        zoom: 15.2,
-        pitch: targetPitch,
-        bearing: -18,
-        duration: 650,
-        easing: EASE_IN_OUT_CUBIC
-      });
+      const targetZoom = 15.2;
+      const targetPitch = getVisibleWidthKm(targetZoom) > AUTO_2D_WIDTH_KM ? 0 : preferredPitch;
+      transitionCamera(targetPitch, targetZoom, { center: CENTER, bearing: -18 });
     });
 
     $("#exportStyle").addEventListener("click", downloadJson);
@@ -1237,32 +1233,52 @@
       const message = event && event.error && event.error.message
         ? event.error.message
         : "Неизвестная ошибка загрузки карты";
+      const isTruncated = /Content-Length header of network response exceeds response Body/i.test(message);
       console.warn("MapLibre error:", message);
 
-      if (!styleReady) {
-        if (styleLoadRetries < 3 && retryTimer === null) {
-          styleLoadRetries += 1;
-          const attempt = styleLoadRetries;
-          setStatus("Повторная загрузка карты · " + attempt + "/3");
-          retryTimer = window.setTimeout(() => {
-            retryTimer = null;
-            if (!styleReady && map) {
-              try {
-                map.setStyle(STYLE_URL, { diff: false });
-              } catch (retryError) {
-                console.warn("Map style retry failed:", retryError);
-              }
-            }
-          }, 700 * attempt);
-          return;
-        }
+      if (isTruncated && interruptedResponseRetries < 2 && networkRetryTimer === null) {
+        interruptedResponseRetries += 1;
+        const attempt = interruptedResponseRetries;
+        setStatus("Ответ карты оборвался · повтор " + attempt + "/2");
+        networkRetryTimer = window.setTimeout(() => {
+          networkRetryTimer = null;
+          if (!map) return;
+          try {
+            map.setStyle(activeStyleDefinition, { diff: false });
+          } catch (retryError) {
+            console.warn("Interrupted response retry failed:", retryError);
+          }
+        }, 900 * attempt);
+        return;
+      }
 
-        const isTruncated = /Content-Length header of network response exceeds response Body/i.test(message);
+      if (!styleReady && styleLoadRetries < 3 && retryTimer === null) {
+        styleLoadRetries += 1;
+        const attempt = styleLoadRetries;
+        setStatus("Повторная загрузка карты · " + attempt + "/3");
+        retryTimer = window.setTimeout(() => {
+          retryTimer = null;
+          if (!styleReady && map) {
+            try {
+              map.setStyle(activeStyleDefinition, { diff: false });
+            } catch (retryError) {
+              console.warn("Map style retry failed:", retryError);
+            }
+          }
+        }, 700 * attempt);
+        return;
+      }
+
+      if (isTruncated) {
         showError(
-          (isTruncated
-            ? "Сервер или промежуточный сетевой узел оборвал ответ карты (получено меньше данных, чем указано в Content-Length). Автоматические повторы не помогли. " 
-            : "Не удалось получить стиль карты после нескольких попыток. ") +
-          "Проверь соединение и повтори загрузку страницы. Источник данных: OpenFreeMap. Подробности: " + message
+          "Ответ карты снова оборвался: браузер получил меньше данных, чем указано в Content-Length. " +
+          "Автоматические повторы не помогли. Это сетевая ошибка загрузки OpenFreeMap, а не ошибка цветовой темы. " +
+          "Обнови страницу или проверь работу через другое соединение. Подробности: " + message
+        );
+      } else if (!styleReady) {
+        showError(
+          "Не удалось загрузить стиль карты после нескольких попыток. " +
+          "Проверь интернет-соединение. Источник данных: OpenFreeMap. Подробности: " + message
         );
       }
     });
