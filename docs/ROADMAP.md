@@ -18,7 +18,7 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Integrate MapLibre Native Android.
 - [ ] Load a compatible third-party vector-map style.
 - [ ] Add required map attribution.
-- [ ] Implement the first editable Waze-inspired dark map palette using centralized style tokens.
+- [ ] Implement the first editable editable Midnight Navigation dark map palette using centralized style tokens.
 - [ ] Keep Violet Night as a separate selectable style preset; do not hard-code colors into individual layers.
 - [ ] Define a style configuration format that supports named presets and custom color overrides.
 - [ ] Load the initial presets from `design/map-style-presets.json` and validate unknown/missing tokens safely.
@@ -49,7 +49,7 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Use OSM physical-width and lane attributes where available.
 - [ ] Separate mapped width from estimated and renderer-fallback widths.
 - [ ] Add zoom-dependent road widths and geometry detail.
-- [ ] Highlight route-compatible lanes in bright white and other lanes in muted grey when route guidance is available, following the general Yandex Navigator lane-guidance pattern.
+- [ ] Highlight route-compatible lanes in bright white and other lanes in muted grey when route guidance is available, using Wemaps' own route-aware lane-guidance design.
 - [ ] Ensure lane separators remain legible without pretending unmapped markings are source data.
 - [ ] Implement viewport-bounded, incremental vector-tile loading.
 - [ ] Cancel obsolete requests and deduplicate features across tile boundaries.
