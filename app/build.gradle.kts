@@ -55,5 +55,4 @@ dependencies {
     implementation(libs.maplibre.android)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
-    testImplementation(libs.junit)
 }
