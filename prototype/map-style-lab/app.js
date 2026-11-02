@@ -320,30 +320,31 @@
 
   function refreshLayerCache() {
     const layers = map.getStyle().layers;
+    const baseLayers = layers.filter((layer) => !String(layer.id || "").startsWith("wemaps-"));
     layerCache = {
-      backgrounds: layers.filter((layer) => layer.type === "background"),
-      transportation: layers.filter((layer) => (
+      backgrounds: baseLayers.filter((layer) => layer.type === "background"),
+      transportation: baseLayers.filter((layer) => (
         layer.type === "line" && layer["source-layer"] === "transportation"
       )),
-      waterFills: layers.filter((layer) => (
+      waterFills: baseLayers.filter((layer) => (
         layer.type === "fill" && layer["source-layer"] === "water"
       )),
-      waterways: layers.filter((layer) => (
+      waterways: baseLayers.filter((layer) => (
         layer.type === "line" && layer["source-layer"] === "waterway"
       )),
-      landcover: layers.filter((layer) => (
+      landcover: baseLayers.filter((layer) => (
         layer.type === "fill" && layer["source-layer"] === "landcover"
       )),
-      landuse: layers.filter((layer) => (
+      landuse: baseLayers.filter((layer) => (
         layer.type === "fill" && layer["source-layer"] === "landuse"
       )),
-      parks: layers.filter((layer) => (
+      parks: baseLayers.filter((layer) => (
         layer.type === "fill" && layer["source-layer"] === "park"
       )),
-      buildings: layers.filter((layer) => (
+      buildings: baseLayers.filter((layer) => (
         layer.type === "fill" && layer["source-layer"] === "building"
       )),
-      symbols: layers.filter((layer) => layer.type === "symbol")
+      symbols: baseLayers.filter((layer) => layer.type === "symbol")
     };
   }
 
@@ -734,7 +735,6 @@
           palette.park
         ]
       ]);
-      map.setPaintProperty(layer.id, "fill-outline-color", palette.wood);
     });
 
     layerCache.landuse.forEach((layer) => {
@@ -780,6 +780,13 @@
     }
     if (map.getLayer("wemaps-road-top-sheen")) {
       map.setPaintProperty("wemaps-road-top-sheen", "line-width", roadWidthExpression(0.33, 0));
+    }
+    if (map.getLayer("wemaps-road-lane-markings")) {
+      map.setPaintProperty("wemaps-road-lane-markings", "line-width", [
+        "interpolate", ["linear"], ["zoom"],
+        14.5, 0.65 * roadWidthScale,
+        18, 1.05 * roadWidthScale
+      ]);
     }
 
     refreshAdaptiveCamera(false);
@@ -830,6 +837,7 @@
       "wemaps:buildings": "Uses source render_height / height attributes without arbitrary height scaling",
       "wemaps:road-style": "Road class widths, visual depth casing, top sheen, and zoom-gated lane markings",
       "wemaps:vegetation": "Woodland patterns are decorative; species detail depends on provider attributes",
+      "wemaps:required-images": "wemaps-forest-generic, wemaps-forest-pine, wemaps-forest-broadleaf, wemaps-orchard, wemaps-vineyard are registered by the prototype at runtime",
       "wemaps:export-note": "Review provider terms and attribution before production use."
     });
 
