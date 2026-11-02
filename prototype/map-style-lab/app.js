@@ -307,13 +307,46 @@
       }
     ];
 
+    const lanePixelsByZoom = { 9: 0.55, 12: 1.4, 15: 2.8, 18: 4.2 };
     const expression = ["interpolate", ["linear"], ["zoom"]];
     stops.forEach((stop) => {
       const values = {};
       Object.keys(stop.values).forEach((key) => {
         values[key] = Math.max(0.25, stop.values[key] * roadWidthScale * multiplier + extra);
       });
-      expression.push(stop.zoom, makeClassMatch(values));
+
+      const classWidth = makeClassMatch(values);
+      const laneCount = [
+        "coalesce",
+        ["to-number", ["get", "lanes"]],
+        [
+          "+",
+          ["to-number", ["get", "lanes:forward"], 0],
+          ["to-number", ["get", "lanes:backward"], 0]
+        ],
+        0
+      ];
+      const widthFromLaneTags = [
+        "+",
+        [
+          "*",
+          ["max", 1, ["min", 10, laneCount]],
+          lanePixelsByZoom[stop.zoom] * roadWidthScale * multiplier
+        ],
+        extra
+      ];
+      const hasLaneTags = [
+        "any",
+        ["has", "lanes"],
+        ["has", "lanes:forward"],
+        ["has", "lanes:backward"]
+      ];
+      expression.push(stop.zoom, [
+        "case",
+        hasLaneTags,
+        ["max", classWidth, widthFromLaneTags],
+        classWidth
+      ]);
     });
     return expression;
   }
