@@ -183,7 +183,6 @@ jobs:
           $env:ANDROID_SDK_ROOT = ""
           $env:CI = "true"
           $env:WEMAPS_NO_PAUSE = "1"
-          $env:WEMAPS_NO_PAUSE = "1"
 
           $probeProject = Join-Path $fakeProfile "AndroidStudioProjects\SdkProbe"
           $fakePlatform = Join-Path $fakeSdk "platforms\android-37.1"
