@@ -1,6 +1,6 @@
 # Wemaps
 
-**A 3D-first, open-source Android navigation app with a distinctive Violet Night map style.**
+**A 3D-first, open-source Android navigation app with an editable Waze-inspired dark map and a Violet Night style preset.**
 
 Wemaps is an early-stage project focused on making everyday navigation clear, expressive, and useful. The map is the app: opening Wemaps should take the user directly to a live map, not to a separate dashboard.
 
@@ -12,7 +12,7 @@ Build an Android navigator that combines:
 
 - A detailed, continuously perspective-oriented 3D map.
 - Extruded buildings wherever usable building data is available.
-- A distinctive dark-purple cartographic style.
+- An editable dark map palette, starting with a Waze-inspired night style and retaining Violet Night as an alternative preset.
 - Clear route guidance, current speed, and mapped speed limits.
 - Speed-camera alerts that respect the camera's actual position and viewing direction.
 - Useful weather information without overwhelming the map.
