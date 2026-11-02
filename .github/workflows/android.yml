@@ -70,6 +70,69 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Smoke-test SDK metadata permission fallback
+        shell: pwsh
+        run: |
+          $testRoot = Join-Path $env:RUNNER_TEMP "wemaps-sdk-fallback-smoke"
+          $fakeSdk = Join-Path $testRoot "existing-sdk"
+          $fakeLocalAppData = Join-Path $testRoot "local-appdata"
+          $fakeManagedSdk = Join-Path $fakeLocalAppData "Wemaps\AndroidSdk"
+          $managerDir = Join-Path $fakeSdk "cmdline-tools\test\bin"
+          New-Item -ItemType Directory -Force -Path $managerDir, $fakeLocalAppData | Out-Null
+
+          $env:ANDROID_SDK_ROOT = $fakeSdk
+          $env:ANDROID_HOME = ""
+          $env:LOCALAPPDATA = $fakeLocalAppData
+          $env:WEMAPS_FAKE_MANAGED_SDK = $fakeManagedSdk
+          Remove-Item Env:CI -ErrorAction SilentlyContinue
+
+          $fakeManager = @'
+          @echo off
+          setlocal EnableExtensions
+          if /I "%~2"=="--licenses" exit /b 0
+          set "SDK_ARG=%~1"
+          set "SDK_ARG=%SDK_ARG:--sdk_root=%"
+          if /I "%SDK_ARG%"=="%WEMAPS_FAKE_MANAGED_SDK%" (
+            if not exist "%SDK_ARG%\platforms\android-37.1" mkdir "%SDK_ARG%\platforms\android-37.1"
+            if not exist "%SDK_ARG%\build-tools\36.0.0" mkdir "%SDK_ARG%\build-tools\36.0.0"
+            > "%SDK_ARG%\platforms\android-37.1\android.jar" echo fake platform
+            > "%SDK_ARG%\build-tools\36.0.0\aapt2.exe" echo fake aapt2
+            > "%SDK_ARG%\build-tools\36.0.0\zipalign.exe" echo fake zipalign
+            exit /b 0
+          )
+          echo Warning: Failed to read or create install properties file.
+          exit /b 1
+          '@
+          [System.IO.File]::WriteAllText(
+            (Join-Path $managerDir "sdkmanager.bat"),
+            $fakeManager,
+            [System.Text.Encoding]::ASCII
+          )
+
+          $resultFile = Join-Path $env:RUNNER_TEMP "wemaps-sdk-fallback-result.txt"
+          $output = & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "windows-build\ensure-android-sdk.ps1" -ResultFile $resultFile 2>&1 | Out-String
+          $exitCode = $LASTEXITCODE
+          Write-Host $output
+
+          if ($exitCode -ne 0) {
+            throw "SDK fallback smoke test exited with code $exitCode"
+          }
+          if (-not (Test-Path $resultFile)) {
+            throw "SDK helper did not return its selected SDK path"
+          }
+          $resolvedSdk = [System.IO.File]::ReadAllText($resultFile).Trim()
+          if ($resolvedSdk -ne $fakeManagedSdk) {
+            throw "SDK helper did not retry in the Wemaps user-local SDK. Resolved: $resolvedSdk"
+          }
+          if (-not (Test-Path (Join-Path $fakeManagedSdk "platforms\android-37.1\android.jar"))) {
+            throw "The fallback SDK platform was not installed"
+          }
+          if (-not (Test-Path (Join-Path $fakeManagedSdk "build-tools\36.0.0\aapt2.exe"))) {
+            throw "The fallback SDK build tools were not installed"
+          }
+          Remove-Item $resultFile -Force
+          Write-Host "SDK metadata permission fallback smoke test passed."
+
   windows-launcher:
     name: Verify Windows Gradle launcher
     runs-on: windows-latest
@@ -118,6 +181,7 @@ jobs:
           $env:ANDROID_HOME = ""
           $env:ANDROID_SDK_ROOT = ""
           $env:CI = "true"
+          $env:WEMAPS_NO_PAUSE = "1"
           $env:WEMAPS_NO_PAUSE = "1"
 
           $probeProject = Join-Path $fakeProfile "AndroidStudioProjects\SdkProbe"
