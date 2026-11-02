@@ -32,7 +32,8 @@ Application entry point, navigation between app features, dependency wiring, and
 
 ### core:designsystem
 
-- Violet Night color tokens.
+- Centralized map-style tokens and named presets (Waze-inspired dark, Violet Night, custom overrides).
+- Runtime style configuration without hard-coded colors in individual map layers.
 - Typography and shapes.
 - Material 3 theme integration.
 - Reusable map controls and cards.
@@ -42,6 +43,7 @@ Application entry point, navigation between app features, dependency wiring, and
 
 - MapLibre lifecycle adapter.
 - Style loading and custom map style.
+- Palette/preset application and custom color overrides.
 - Camera and gesture behavior.
 - 3D building layers.
 - Route, sign, speed-camera, and point-of-interest overlays.
@@ -100,7 +102,7 @@ The names above describe responsibilities; they are not yet implemented Kotlin A
 Provider adapters must expose:
 
 - Required attribution.
-- Availability of required OSM feature properties (including road width, lane structure, and camera tags where supported).
+- Availability of required OSM feature properties (including road width, lane structure, turn-lane values, and camera tags where supported).
 - Terms and license references.
 - Rate limits and download restrictions.
 - API-key requirements.
