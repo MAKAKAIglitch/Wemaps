@@ -3,14 +3,17 @@
 
   const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
   const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
-  const CAMERA_MIN_ZOOM = 11.5;
-  const CAMERA_MAX_BBOX_AREA = 0.42;
+  const CAMERA_MIN_ZOOM = 13.5;
+  const ROAD_DATA_MIN_ZOOM = 15.5;
+  const CAMERA_MAX_BBOX_AREA = 0.035;
+  const OVERPASS_TIMEOUT_MS = 12000;
+  const OSM_CACHE_TTL_MS = 5 * 60 * 1000;
   const CENTER = [13.405, 52.52];
   const DEFAULT_PITCH = 73;
   const AUTO_2D_WIDTH_KM = 5;
   const CAMERA_TRANSITION_MS = 1320;
   const BUILDING_FADE_MS = 1080;
-  const STORAGE_KEY = "wemaps.violet-night.style-lab.v2";
+  const STORAGE_KEY = "wemaps.violet-night.style-lab.v3";
   const LEGACY_STORAGE_KEY = "wemaps.violet-night.style-lab.v1";
   const EASE_IN_OUT_CUBIC = (t) => t < 0.5
     ? 4 * t * t * t
@@ -23,13 +26,13 @@
     wood: "#1d352b",
     water: "#142135",
     beach: "#70562c",
-    minor: "#716587",
-    local: "#8f7baa",
-    secondary: "#ad95d4",
-    primary: "#c3a8ed",
-    trunk: "#cfb0f4",
-    motorway: "#dec9ff",
-    casing: "#30243f",
+    minor: "#44394f",
+    local: "#50415f",
+    secondary: "#5d4a70",
+    primary: "#6b5484",
+    trunk: "#795e94",
+    motorway: "#896ba6",
+    casing: "#21192d",
     buildingRoof: "#51436a",
     buildingOutline: "#342842"
   };
@@ -98,6 +101,9 @@
   let osmRequestController = null;
   let osmRequestTimer = null;
   let osmRequestSerial = 0;
+  let osmRequestTimeout = null;
+  let osmCache = new Map();
+  let lastRoadScaleLatitude = null;
   let overlayClickHandlersBound = false;
 
   function setStatus(text) {
@@ -745,7 +751,9 @@
     const laneCount = roadLaneCountExpression();
     const laneFilter = [
       "all",
-      ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"]]],
+      ["in", ["get", "class"], ["literal", [
+        "motorway", "trunk", "primary", "secondary", "tertiary", "minor"
+      ]]],
       [">=", laneCount, 2],
       ["!=", ["get", "brunnel"], "tunnel"]
     ];
@@ -761,11 +769,10 @@
         filter: baseFilter,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#080610",
-          "line-width": roadWidthExpression(1.2, 1.0),
-          "line-opacity": 0.48,
-          "line-blur": 0.9,
-          "line-translate": [0, 1.3],
+          "line-color": "#07050c",
+          "line-width": roadWidthExpression(1.14, 0.9),
+          "line-opacity": 0.4,
+          "line-translate": [0, 1.2],
           "line-translate-anchor": "viewport"
         }
       }, beforeId);
@@ -781,9 +788,9 @@
         filter: bridgeFilter,
         layout: { "line-cap": "butt", "line-join": "round" },
         paint: {
-          "line-color": "#241b32",
-          "line-width": roadWidthExpression(1.12, 0.9),
-          "line-opacity": 0.96
+          "line-color": "#21182e",
+          "line-width": roadWidthExpression(1.10, 0.7),
+          "line-opacity": 0.98
         }
       }, beforeId);
     }
@@ -798,9 +805,9 @@
         filter: rampFilter,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#dbbdff",
-          "line-width": roadWidthExpression(1.04, 0.2),
-          "line-opacity": 0.28
+          "line-color": "#a88ac7",
+          "line-width": roadWidthExpression(0.98, 0.15),
+          "line-opacity": 0.42
         }
       }, beforeId);
     }
@@ -815,13 +822,10 @@
         filter: laneFilter,
         layout: { "line-cap": "butt", "line-join": "round" },
         paint: {
-          "line-color": "#fff3ff",
-          "line-width": [
-            "interpolate", ["linear"], ["zoom"],
-            14.5, 0.85, 17, 1.15, 20, 1.45
-          ],
-          "line-opacity": 0.94,
-          "line-dasharray": ["literal", [3, 2.4]]
+          "line-color": "#fff4ff",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 14.5, 1.0, 17, 1.35, 20, 1.6],
+          "line-opacity": 1,
+          "line-dasharray": ["literal", [3.2, 2.2]]
         }
       }, beforeId);
     }
@@ -838,14 +842,11 @@
         filter: multiLaneFilter,
         layout: { "line-cap": "butt", "line-join": "round" },
         paint: {
-          "line-color": "#eadcff",
-          "line-width": [
-            "interpolate", ["linear"], ["zoom"],
-            15.5, 0.72, 18, 1.05, 20, 1.25
-          ],
+          "line-color": "#f0e3ff",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 15.5, 0.9, 18, 1.2, 20, 1.4],
           "line-offset": roadWidthExpression(1, 0, side * 0.25),
-          "line-opacity": 0.86,
-          "line-dasharray": ["literal", [2.8, 2.4]]
+          "line-opacity": 0.96,
+          "line-dasharray": ["literal", [2.8, 2.2]]
         }
       }, beforeId);
     });
@@ -1021,6 +1022,47 @@
 
     const beforeId = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
     const source = "wemaps-osm-live";
+    if (!map.getLayer("wemaps-osm-measured-road-fill")) {
+      map.addLayer({
+        id: "wemaps-osm-measured-road-fill",
+        type: "fill",
+        source,
+        minzoom: 14.5,
+        filter: ["==", ["get", "kind"], "measured-road"],
+        paint: {
+          "fill-color": [
+            "match", ["get", "roadClass"],
+            "motorway", "#34263f",
+            "trunk", "#31243b",
+            "primary", "#2e2238",
+            "secondary", "#2a2033",
+            "tertiary", "#271e30",
+            "residential", "#241c2d",
+            "service", "#211a29",
+            "#261e31"
+          ],
+          "fill-opacity": 1,
+          "fill-outline-color": "#100c17"
+        }
+      }, beforeId);
+    }
+    if (!map.getLayer("wemaps-osm-measured-lane-markings")) {
+      map.addLayer({
+        id: "wemaps-osm-measured-lane-markings",
+        type: "line",
+        source,
+        minzoom: 15.5,
+        filter: ["==", ["get", "kind"], "measured-lanes"],
+        layout: { "line-cap": "butt", "line-join": "round" },
+        paint: {
+          "line-color": "#fff7ff",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 15.5, 1.05, 18, 1.45],
+          "line-opacity": 1,
+          "line-dasharray": ["literal", [3.2, 2.0]]
+        }
+      }, beforeId);
+    }
+
 
     if (!map.getLayer("wemaps-camera-view-cones")) {
       map.addLayer({
@@ -1105,24 +1147,132 @@
     if (node) node.textContent = message;
   }
 
+  function parseOsmWidthMeters(tags) {
+    const candidates = [
+      ["width:effective", tags["width:effective"]],
+      ["width:carriageway", tags["width:carriageway"]],
+      ["width", tags.width]
+    ];
+    for (const [key, raw] of candidates) {
+      if (!raw) continue;
+      const value = String(raw).trim().toLowerCase().replace(",", ".");
+      const match = value.match(/(\\d+(?:\\.\\d+)?)/);
+      if (!match) continue;
+      let widthMeters = Number(match[1]);
+      if (!Number.isFinite(widthMeters) || widthMeters <= 0 || widthMeters > 100) continue;
+      if (/\\b(ft|foot|feet)\\b|['′]/.test(value)) widthMeters *= 0.3048;
+      return { widthMeters, widthTag: key };
+    }
+    return null;
+  }
+
+  function parseOsmLaneCount(tags) {
+    const direct = Number.parseFloat(String(tags.lanes || "").replace(",", "."));
+    if (Number.isFinite(direct) && direct > 0 && direct <= 20) return Math.round(direct);
+    const forward = Number.parseFloat(String(tags["lanes:forward"] || "").replace(",", "."));
+    const backward = Number.parseFloat(String(tags["lanes:backward"] || "").replace(",", "."));
+    const total = (Number.isFinite(forward) ? forward : 0) + (Number.isFinite(backward) ? backward : 0);
+    return total > 0 && total <= 20 ? Math.round(total) : null;
+  }
+
+  function osmBearing(a, b) {
+    const lon1 = a[0] * Math.PI / 180;
+    const lon2 = b[0] * Math.PI / 180;
+    const lat1 = a[1] * Math.PI / 180;
+    const lat2 = b[1] * Math.PI / 180;
+    const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2)
+      - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  function offsetOsmLine(coordinates, offsetMeters) {
+    return coordinates.map((point, index) => {
+      const previous = coordinates[Math.max(0, index - 1)];
+      const next = coordinates[Math.min(coordinates.length - 1, index + 1)];
+      const before = osmBearing(previous, point) * Math.PI / 180;
+      const after = osmBearing(point, next) * Math.PI / 180;
+      const tangent = Math.atan2(Math.sin(before) + Math.sin(after), Math.cos(before) + Math.cos(after));
+      const bearing = (tangent * 180 / Math.PI + (offsetMeters >= 0 ? 90 : -90) + 360) % 360;
+      return destinationPoint(point[0], point[1], bearing, Math.abs(offsetMeters));
+    });
+  }
+
+  function makeOsmRoadPolygon(coordinates, widthMeters) {
+    if (!coordinates || coordinates.length < 2 || !widthMeters) return null;
+    const left = offsetOsmLine(coordinates, widthMeters / 2);
+    const right = offsetOsmLine(coordinates, -widthMeters / 2).reverse();
+    return left.concat(right, [left[0]]);
+  }
+
   function buildOsmOverlayFeatures(data) {
     const features = [];
     const seen = new Set();
     let cameras = 0;
     let junctions = 0;
+    let measuredWidthRoads = 0;
+    let laneTaggedRoads = 0;
 
     (data.elements || []).forEach((element) => {
       const tags = element.tags || {};
       const id = element.type + "/" + element.id;
       if (seen.has(id)) return;
 
+      const geometry = Array.isArray(element.geometry)
+        ? element.geometry.filter((point) => Number.isFinite(point.lon) && Number.isFinite(point.lat))
+          .map((point) => [point.lon, point.lat])
+        : [];
       const point = Number.isFinite(element.lat) && Number.isFinite(element.lon)
         ? [element.lon, element.lat]
         : (element.center && Number.isFinite(element.center.lon) && Number.isFinite(element.center.lat)
           ? [element.center.lon, element.center.lat]
           : null);
-      if (!point) return;
 
+      if (element.type === "way" && tags.highway && geometry.length >= 2) {
+        const width = parseOsmWidthMeters(tags);
+        const lanes = parseOsmLaneCount(tags);
+        if (width) {
+          const polygon = makeOsmRoadPolygon(geometry, width.widthMeters);
+          if (polygon) {
+            measuredWidthRoads += 1;
+            features.push({
+              type: "Feature",
+              properties: {
+                kind: "measured-road",
+                osmId: id,
+                roadClass: tags.highway,
+                widthMeters: width.widthMeters,
+                widthTag: width.widthTag,
+                lanes: lanes || 0,
+                name: tags.name || ""
+              },
+              geometry: { type: "Polygon", coordinates: [polygon] }
+            });
+          }
+        }
+        if (lanes) {
+          laneTaggedRoads += 1;
+          const widthMeters = width ? width.widthMeters : lanes * 3.25;
+          const dividers = [];
+          for (let divider = 1; divider < lanes; divider += 1) {
+            dividers.push(offsetOsmLine(geometry, (divider / lanes - 0.5) * widthMeters));
+          }
+          if (dividers.length) {
+            features.push({
+              type: "Feature",
+              properties: {
+                kind: "measured-lanes",
+                osmId: id,
+                lanes,
+                widthKnown: width ? "yes" : "no"
+              },
+              geometry: { type: "MultiLineString", coordinates: dividers }
+            });
+          }
+        }
+      }
+
+      if (!point) return;
       if (tags.highway === "motorway_junction") {
         seen.add(id);
         junctions += 1;
@@ -1172,44 +1322,79 @@
     return {
       collection: { type: "FeatureCollection", features },
       cameras,
-      junctions
+      junctions,
+      measuredWidthRoads,
+      laneTaggedRoads
     };
+  }
+
+  function osmCacheKey(bounds) {
+    return [
+      bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()
+    ].map((value) => value.toFixed(3)).join("|");
   }
 
   async function fetchOsmOverlays() {
     if (!map || !styleReady || !map.getSource("wemaps-osm-live")) return;
     if (map.getZoom() < CAMERA_MIN_ZOOM) {
       map.getSource("wemaps-osm-live").setData({ type: "FeatureCollection", features: [] });
-      osmOverlayStatus("Камеры и съезды OSM · приблизь карту");
+      osmOverlayStatus("Камеры OSM · приблизь карту");
       return;
     }
 
     const bounds = map.getBounds();
-    const west = bounds.getWest();
-    const south = bounds.getSouth();
-    const east = bounds.getEast();
-    const north = bounds.getNorth();
-    const area = Math.abs((east - west) * (north - south));
+    const area = Math.abs((bounds.getEast() - bounds.getWest()) * (bounds.getNorth() - bounds.getSouth()));
     if (area > CAMERA_MAX_BBOX_AREA) {
-      osmOverlayStatus("Камеры OSM · приблизь для загрузки");
+      osmOverlayStatus("OSM-слои · приблизь карту для точных данных");
+      return;
+    }
+
+    const key = osmCacheKey(bounds);
+    const cached = osmCache.get(key);
+    if (cached && Date.now() - cached.time < OSM_CACHE_TTL_MS) {
+      map.getSource("wemaps-osm-live").setData(cached.collection);
+      osmOverlayStatus("OSM · кэш: камеры " + cached.cameras + " · ширина из OSM " + cached.measuredWidthRoads);
       return;
     }
 
     if (osmRequestController) osmRequestController.abort();
+    if (osmRequestTimeout !== null) {
+      window.clearTimeout(osmRequestTimeout);
+      osmRequestTimeout = null;
+    }
+
     const controller = new AbortController();
     osmRequestController = controller;
     const serial = ++osmRequestSerial;
-    const bbox = [south, west, north, east].map((value) => value.toFixed(5)).join(",");
+    const bbox = [
+      bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()
+    ].map((value) => value.toFixed(5)).join(",");
+    const includeRoadGeometry = map.getZoom() >= ROAD_DATA_MIN_ZOOM;
     const query = [
-      "[out:json][timeout:20];",
+      "[out:json][timeout:10];",
       "(",
       'node["highway"="speed_camera"](' + bbox + ");",
       'nwr["man_made"="surveillance"]["surveillance:type"~"^(camera|ALPR)$"]["surveillance:zone"~"^(traffic|road|street|motorway)$"](' + bbox + ");",
       'node["highway"="motorway_junction"](' + bbox + ");",
-      ");out center tags;"
+      ...(includeRoadGeometry ? [
+        'way["highway"]["width"](' + bbox + ");",
+        'way["highway"]["width:effective"](' + bbox + ");",
+        'way["highway"]["width:carriageway"](' + bbox + ");",
+        'way["highway"]["lanes"](' + bbox + ");',
+        'way["highway"]["lanes:forward"](' + bbox + ");',
+        'way["highway"]["lanes:backward"](' + bbox + ");'
+      ] : []),
+      ");out center geom tags;"
     ].join("");
 
-    osmOverlayStatus("Камеры OSM · загрузка…");
+    osmOverlayStatus(includeRoadGeometry
+      ? "OSM · камеры и размеченная ширина дорог…"
+      : "OSM · загрузка камер…");
+
+    osmRequestTimeout = window.setTimeout(() => {
+      if (serial === osmRequestSerial && !controller.signal.aborted) controller.abort();
+    }, OVERPASS_TIMEOUT_MS);
+
     try {
       const response = await fetch(OVERPASS_URL, {
         method: "POST",
@@ -1224,11 +1409,37 @@
       const result = buildOsmOverlayFeatures(data);
       const source = map.getSource("wemaps-osm-live");
       if (source) source.setData(result.collection);
-      osmOverlayStatus("Камеры OSM: " + result.cameras + " · съезды: " + result.junctions);
+      osmCache.set(key, {
+        time: Date.now(),
+        collection: result.collection,
+        cameras: result.cameras,
+        junctions: result.junctions,
+        measuredWidthRoads: result.measuredWidthRoads,
+        laneTaggedRoads: result.laneTaggedRoads
+      });
+      while (osmCache.size > 24) {
+        osmCache.delete(osmCache.keys().next().value);
+      }
+      osmOverlayStatus(
+        "OSM: камеры " + result.cameras +
+        " · ширина из OSM " + result.measuredWidthRoads +
+        " · полосы " + result.laneTaggedRoads +
+        " · съезды " + result.junctions
+      );
     } catch (error) {
-      if (error.name === "AbortError") return;
-      console.warn("OpenStreetMap camera overlay:", error);
-      osmOverlayStatus("Камеры OSM · источник временно недоступен");
+      if (error.name === "AbortError") {
+        if (serial === osmRequestSerial) {
+          osmOverlayStatus("OSM · запрос превысил 12 секунд");
+        }
+        return;
+      }
+      console.warn("OpenStreetMap live overlays:", error);
+      osmOverlayStatus("OSM · источник недоступен, базовая карта работает");
+    } finally {
+      if (serial === osmRequestSerial && osmRequestTimeout !== null) {
+        window.clearTimeout(osmRequestTimeout);
+        osmRequestTimeout = null;
+      }
     }
   }
 
@@ -1237,7 +1448,7 @@
     osmRequestTimer = window.setTimeout(() => {
       osmRequestTimer = null;
       fetchOsmOverlays();
-    }, 550);
+    }, 1450);
   }
 
   function refreshRoadWidthExpressions(force = false) {
@@ -1633,10 +1844,10 @@
 
     map.on("resize", () => {
       refreshAdaptiveCamera(false);
-      refreshRoadWidthExpressions();
+      refreshRoadWidthExpressions(true);
     });
     map.on("moveend", () => {
-      refreshRoadWidthExpressions();
+      refreshRoadWidthExpressions(false);
       scheduleOsmOverlayFetch();
     });
     map.on("pitchend", () => refreshAdaptiveCamera(false));
