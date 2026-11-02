@@ -51,6 +51,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +70,7 @@ import org.wemaps.app.map.MapPalette
 @Composable
 fun MapScreen() {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val palette = remember(context) { MapStyleConfig.load(context) }
     val snackbarState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -124,7 +128,7 @@ fun MapScreen() {
         }
     }
 
-    DisposableEffect(context, hasLocationPermission, hasFineLocationPermission) {
+    DisposableEffect(context, lifecycle, hasLocationPermission, hasFineLocationPermission) {
         if (!hasLocationPermission) {
             onDispose { }
         } else {
@@ -158,30 +162,55 @@ fun MapScreen() {
                 listOf(LocationManager.NETWORK_PROVIDER)
             }
 
-            for (provider in providers) {
-                runCatching {
-                    if (!locationManager.isProviderEnabled(provider)) return@runCatching
+            var updatesStarted = false
+            fun startLocationUpdates() {
+                if (updatesStarted) return
+                updatesStarted = true
 
-                    locationManager.getLastKnownLocation(provider)?.let { lastFix ->
-                        if (lastFix.time > (deviceLocation?.timestampMillis ?: 0L)) {
-                            acceptLocation(lastFix)
+                for (provider in providers) {
+                    runCatching {
+                        if (!locationManager.isProviderEnabled(provider)) return@runCatching
+
+                        locationManager.getLastKnownLocation(provider)?.let { lastFix ->
+                            if (lastFix.time > (deviceLocation?.timestampMillis ?: 0L)) {
+                                acceptLocation(lastFix)
+                            }
                         }
-                    }
 
-                    locationManager.requestLocationUpdates(
-                        provider,
-                        1_200L,
-                        1.5f,
-                        listener,
-                        Looper.getMainLooper()
-                    )
-                }.onFailure {
-                    // A missing or disabled provider should not prevent the other provider working.
+                        locationManager.requestLocationUpdates(
+                            provider,
+                            1_200L,
+                            1.5f,
+                            listener,
+                            Looper.getMainLooper()
+                        )
+                    }.onFailure {
+                        // A missing or disabled provider should not prevent the other provider working.
+                    }
                 }
             }
 
-            onDispose {
+            fun stopLocationUpdates() {
+                if (!updatesStarted) return
+                updatesStarted = false
                 runCatching { locationManager.removeUpdates(listener) }
+            }
+
+            val lifecycleObserver = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_START -> startLocationUpdates()
+                    Lifecycle.Event.ON_STOP -> stopLocationUpdates()
+                    else -> Unit
+                }
+            }
+            lifecycle.addObserver(lifecycleObserver)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                startLocationUpdates()
+            }
+
+            onDispose {
+                lifecycle.removeObserver(lifecycleObserver)
+                stopLocationUpdates()
             }
         }
     }
