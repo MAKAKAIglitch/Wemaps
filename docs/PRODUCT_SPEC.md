@@ -99,6 +99,34 @@ Use MapLibre Native Android for GPU-accelerated vector map rendering.
 
 Road class must be communicated through a combination of line width, contrast, casing, and color. The route should be visually dominant without hiding intersections or road geometry.
 
+## 4A. Road appearance, width, and lane markings
+
+Roads are a primary visual feature of Violet Night and must remain immediately legible on the dark map.
+
+- Use a layered road style (casing plus surface) with clear contrast between road classes.
+- Use OSM physical-width information when present, including `width`, `est_width`, and lane-width tags supported by the selected data source.
+- Use lane counts and lane-specific tags to improve road geometry and lane presentation.
+- Preserve provenance: mapped/measured width, estimated width, and style-only fallback width are different states. Never label a cartographic fallback as an actual OSM width.
+- When physical width is missing, use a documented road-class and zoom-dependent visual fallback.
+- Lane separators and markings must be clearly visible. If OSM does not contain exact marking geometry, render schematic lane separators from available lane counts and road structure; treat them as a visualization, not source data.
+- Ensure ramps, service roads, divided carriageways, and complex intersections remain distinct.
+- Adjust line widths and detail by zoom without causing roads to disappear or merge into one another.
+
+## 4B. Incremental loading and responsiveness
+
+The map must never enter an unbounded preparation phase for roads, cameras, or other OSM features.
+
+- Load data incrementally through visible vector tiles and a bounded viewport/route context.
+- Do not request or preprocess all cameras or all roads at application startup.
+- Cancel obsolete tile/feature requests after camera movement and debounce rapid viewport updates.
+- Render available data progressively rather than blocking the map until all nearby features are prepared.
+- Perform parsing, filtering, and spatial indexing away from the Android main thread.
+- Use tile caching, geometry simplification, zoom-dependent layers, and camera clustering at low zoom levels.
+- Avoid duplicate processing of the same feature across adjacent tiles; deduplicate by stable source identity where possible.
+- Apply bounded queues, request concurrency, and memory-aware cache limits.
+- Keep map gestures and camera animation responsive while network requests or feature processing continue.
+- Measure frame pacing, startup time, memory, CPU, and network use on representative devices.
+
 ## 5. Navigation screen
 
 The navigation layout is a dedicated arrangement over the same map.
