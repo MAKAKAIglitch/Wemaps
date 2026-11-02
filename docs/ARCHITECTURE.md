@@ -153,14 +153,17 @@ The renderer and data layer must be viewport-driven, not a global OSM preparatio
 
 ## 6. Location and speed
 
-Location collection runs through Android platform APIs. The app should:
+The current Android prototype uses Android `LocationManager` with runtime approximate or precise permission:
 
-- Request only the permissions required for the current feature.
-- Avoid unnecessary background location collection.
-- Handle missing, stale, low-accuracy, and jumping fixes.
-- Display GPS-derived speed with an appropriate unavailable state.
-- Avoid using a single noisy fix as a reliable movement direction.
-- Keep location history on-device unless a clearly disclosed feature requires a provider request.
+- `ACCESS_COARSE_LOCATION` allows a network-derived approximate fix.
+- `ACCESS_FINE_LOCATION` enables GPS and network providers.
+- Updates are registered only while the Activity is started and removed when it stops.
+- The current position is rendered as a MapLibre GeoJSON point with a custom geographic pointer.
+- The first valid fix recentres the map; the location control can recenter it again.
+- The pointer uses Android's course bearing only when a usable movement bearing is reported; otherwise it retains the last reliable course.
+- No background-location permission or background tracking is used.
+
+The current prototype does not yet display a user-facing accuracy radius or GPS speed. The `accuracyMeters` and `speedMetersPerSecond` values are retained in the in-memory location model for later UI work. Avoid using a single noisy fix as a reliable movement direction. Keep location history on-device unless a clearly disclosed feature requires a provider request.
 
 Location speed is an estimate from the device's positioning subsystem, not a certified vehicle instrument.
 
