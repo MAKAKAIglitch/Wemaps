@@ -114,6 +114,8 @@ Roads are a primary visual feature of Violet Night and must remain immediately l
 - Preserve ramps, service roads, divided carriageways, and complex intersections as separate geometry.
 - Adjust rendering detail by zoom without making roads disappear or merge into one another.
 
+The selected vector-tile provider must be tested to confirm that it actually exposes the OSM width and lane properties required by the renderer. A style cannot use tags that the provider has omitted from its tiles. If a provider strips these properties, Wemaps must select a compatible source or a permitted supplemental data source; it must not claim to render actual OSM widths from unavailable attributes.
+
 ## 4B. Incremental loading and responsiveness
 
 Road vector-tile loading and speed-camera preparation are independent pipelines. Camera preparation must never delay the first map frame, road rendering, GPS marker updates, or map gestures.
