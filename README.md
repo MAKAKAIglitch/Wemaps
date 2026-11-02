@@ -91,13 +91,15 @@ On Linux or macOS:
 ./gradlew :app:assembleDebug
 ```
 
-On Windows:
+On Windows, double-click `build-windows.bat` or run:
 
 ```bat
-gradlew.bat :app:assembleDebug
+build-windows.bat
 ```
 
-The Windows launcher automatically searches for a compatible JDK in `JAVA_HOME`, `JDK_HOME`, `PATH`, Android Studio's bundled JBR, JetBrains-managed JDKs, and common installation folders. A JDK 17 or newer must already be installed; setting `JAVA_HOME` manually is usually unnecessary. The launcher also downloads the pinned Gradle distribution and verifies its SHA-256 checksum before running it.
+The script detects the Android SDK from `ANDROID_SDK_ROOT`, `ANDROID_HOME`, the project's `local.properties`, or Android Studio's default SDK folder. It calls the Gradle launcher, keeps the console open after the build, saves output to `build-windows.log`, and copies the result to `Wemaps-debug.apk` in the repository root.
+
+The Windows Gradle launcher automatically searches for a compatible JDK in `JAVA_HOME`, `JDK_HOME`, `PATH`, Android Studio's bundled JBR, JetBrains-managed JDKs, and common installation folders. A JDK 17 or newer must already be installed; setting `JAVA_HOME` manually is usually unnecessary. The launcher also downloads the pinned Gradle distribution and verifies its SHA-256 checksum before running it.
 
 Android Studio can also open the repository as a Gradle project.
 
