@@ -138,7 +138,11 @@ See [Architecture](docs/ARCHITECTURE.md) for the planned provider boundaries.
 
 ## Development status
 
-The repository is currently in the specification stage. The next milestone is a minimal Android shell that opens directly into a MapLibre map with the Violet Night style and a 3D camera. Navigation, live speed limits, camera alerts, search, and weather will be added incrementally.
+The Android application is still at the specification stage. A separate local browser prototype is available for experimenting with the Violet Night map style before the Android implementation.
+
+### Local map style prototype
+
+A Windows-friendly browser editor is available in [prototype/map-style-lab](prototype/map-style-lab/README.md). It runs on localhost with Python's standard library, loads vector tiles from OpenFreeMap, supports live color and 3D-building adjustments, and exports a MapLibre Style JSON file. It does not require a Wemaps server.
 
 See:
 
