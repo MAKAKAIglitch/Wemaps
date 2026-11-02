@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# Give every validation run its own group so a newer push cannot
+# interrupt an Android build halfway through dependency or compiler checks.
 concurrency:
-  group: android-build-validation-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-build-validation-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   assemble:
