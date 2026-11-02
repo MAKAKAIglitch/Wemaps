@@ -97,7 +97,7 @@ On Windows, double-click `build-windows.bat` or run:
 build-windows.bat
 ```
 
-The script detects the Android SDK from `ANDROID_SDK_ROOT`, `ANDROID_HOME`, the project's `local.properties`, or Android Studio's default SDK folder. It calls the Gradle launcher, keeps the console open after the build, saves output to `build-windows.log`, and copies the result to `Wemaps-debug.apk` in the repository root.
+The modular Windows builder reuses an existing Android SDK. It searches `ANDROID_SDK_ROOT`, `ANDROID_HOME`, the current project's and other Android projects' `local.properties`, Android Studio's saved SDK settings, PATH, and common SDK folders. If automatic detection cannot identify the SDK, it offers a folder picker for the existing SDK. It checks for Android SDK Platform 37.1 and Build-Tools 36.0.0; when either package is missing, it asks before adding only those required packages to the existing SDK. It does not reinstall Android Studio. The build log is saved as `build-windows.log`, and the APK is copied to `Wemaps-debug.apk` in the repository root.
 
 The Windows Gradle launcher automatically searches for a compatible JDK in `JAVA_HOME`, `JDK_HOME`, `PATH`, Android Studio's bundled JBR, JetBrains-managed JDKs, and common installation folders. A JDK 17 or newer must already be installed; setting `JAVA_HOME` manually is usually unnecessary. The launcher also downloads the pinned Gradle distribution and verifies its SHA-256 checksum before running it.
 
