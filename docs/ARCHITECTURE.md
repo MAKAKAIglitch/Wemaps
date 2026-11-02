@@ -32,7 +32,7 @@ Application entry point, navigation between app features, dependency wiring, and
 
 ### core:designsystem
 
-- Centralized map-style tokens and named presets (Waze-inspired dark, Violet Night, custom overrides).
+- Centralized map-style tokens and named presets, initially stored in `design/map-style-presets.json` (Waze-inspired dark, Violet Night, custom overrides).
 - Runtime style configuration without hard-coded colors in individual map layers.
 - Typography and shapes.
 - Material 3 theme integration.
@@ -44,6 +44,7 @@ Application entry point, navigation between app features, dependency wiring, and
 - MapLibre lifecycle adapter.
 - Style loading and custom map style.
 - Palette/preset application and custom color overrides.
+- Load semantic color tokens from the versioned preset configuration; persist user overrides locally.
 - Camera and gesture behavior.
 - 3D building layers.
 - Route, sign, speed-camera, and point-of-interest overlays.
