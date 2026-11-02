@@ -1571,6 +1571,20 @@
   function scheduleOsmOverlayFetch() {
     if (cameraRequestTimer !== null) window.clearTimeout(cameraRequestTimer);
     if (roadRequestTimer !== null) window.clearTimeout(roadRequestTimer);
+
+    // Cancel requests for the previous viewport immediately; do not let stale geometry
+    // replace the current map while the new viewport is waiting for its debounce.
+    if (cameraRequestController) {
+      cameraRequestController.abort();
+      cameraRequestController = null;
+      cameraRequestSerial += 1;
+    }
+    if (roadRequestController) {
+      roadRequestController.abort();
+      roadRequestController = null;
+      roadRequestSerial += 1;
+    }
+
     cameraRequestTimer = window.setTimeout(() => {
       cameraRequestTimer = null;
       fetchCameraOverlays();
