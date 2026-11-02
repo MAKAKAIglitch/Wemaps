@@ -70,6 +70,19 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows-launcher:
+    name: Verify Windows Gradle launcher
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up test JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Smoke-test SDK metadata permission fallback
         shell: pwsh
         run: |
@@ -133,18 +146,6 @@ jobs:
           Remove-Item $resultFile -Force
           Write-Host "SDK metadata permission fallback smoke test passed."
 
-  windows-launcher:
-    name: Verify Windows Gradle launcher
-    runs-on: windows-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Set up test JDK
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "17"
 
       - name: Verify automatic Java discovery from PATH
         shell: pwsh
