@@ -377,47 +377,59 @@ if (-not (Test-SdkInstallWritable -Root $SdkRoot)) {
 Write-Host ''
 Write-Host "Wemaps requires Platform $RequiredPlatform and Build-Tools $RequiredBuildTools."
 Write-Host 'Any already installed SDK packages will be reused.'
-Write-Host 'sdkmanager will ask separately for licenses required by these packages.'
-$Consent = Read-Host 'Install the missing packages? [Y/N]'
+Write-Host 'This follows the Clear GPS setup flow: after confirmation, sdkmanager license prompts are accepted automatically.'
+$Consent = Read-Host 'Install required packages and accept the Android SDK license agreements? [Y/N]'
 if ($Consent -notmatch '^(?i)y(es)?$') {
     throw 'Android SDK package installation was declined.'
 }
 
 $PreviousPreference = $ErrorActionPreference
 try {
+    # Match the Clear GPS SDK setup flow: ask once before accepting the pending
+    # SDK licenses, then install only the two SDK packages Wemaps requires.
     # Native sdkmanager diagnostics can appear on stderr in Windows PowerShell 5.1.
-    # Do not pipe automatic "y" answers to --licenses: that command lists every
-    # pending SDK repository license, including packages Wemaps does not use.
-    # Installing the two requested packages directly makes sdkmanager prompt
-    # only for the licenses actually required by those packages.
     $ErrorActionPreference = 'Continue'
-    Write-Host "Installing missing SDK packages: platforms;$RequiredPlatform and build-tools;$RequiredBuildTools"
-    Write-Host 'Review each license prompt from sdkmanager and answer it individually.'
+
+    Write-Host 'Accepting Android SDK licenses after confirmation...'
+    $LicenseAnswers = 1..100 | ForEach-Object { 'y' }
+    $LicenseAnswers | & $SdkManager "--sdk_root=$SdkRoot" '--licenses' | Out-Host
+    $LicenseExitCode = $LASTEXITCODE
+    if ($LicenseExitCode -ne 0) {
+        throw "sdkmanager --licenses failed with exit code $LicenseExitCode."
+    }
+
+    Write-Host "Installing Android SDK Platform $RequiredPlatform and Build-Tools $RequiredBuildTools..."
     $InstallMessages = @()
     & $SdkManager "--sdk_root=$SdkRoot" "platforms;$RequiredPlatform" "build-tools;$RequiredBuildTools" 2>&1 |
         Tee-Object -Variable InstallMessages | Out-Host
     $InstallExitCode = $LASTEXITCODE
 
-    # Some SDK folders pass a basic existence check but still reject package
-    # installation. Retry this specific permissions/metadata failure in a
-    # private, user-writable SDK instead of requiring an administrator shell.
+    # Some SDK roots pass basic write checks but still reject the SDK metadata
+    # file. Retry the same package installation in Wemaps' isolated user SDK.
     $InstallText = $InstallMessages -join [Environment]::NewLine
     if ($InstallExitCode -ne 0 -and
         $InstallText -match '(?i)Failed to read or create install properties file' -and
         $SdkRoot -ne $ManagedSdkRoot) {
 
         Write-Host ''
-        Write-Host 'sdkmanager could not create its install properties in the selected SDK.'
-        Write-Host "Retrying in the user-local SDK: $ManagedSdkRoot"
+        Write-Host 'The selected SDK rejected its install properties file.'
+        Write-Host "Retrying in Wemaps' user-local SDK: $ManagedSdkRoot"
         if (-not (Test-SdkInstallWritable -Root $ManagedSdkRoot)) {
-            throw "The user-local Android SDK folder is not writable: $ManagedSdkRoot"
+            throw "The Wemaps user-local SDK folder is not writable: $ManagedSdkRoot"
         }
 
         $SdkRoot = $ManagedSdkRoot
         Add-SdkRoot -Path $SdkRoot
 
-        Write-Host "Retrying SDK package installation in: $SdkRoot"
-        Write-Host 'Review each required license prompt and answer it individually.'
+        Write-Host 'Accepting Android SDK licenses for the Wemaps user-local SDK...'
+        $LicenseAnswers = 1..100 | ForEach-Object { 'y' }
+        $LicenseAnswers | & $SdkManager "--sdk_root=$SdkRoot" '--licenses' | Out-Host
+        $LicenseExitCode = $LASTEXITCODE
+        if ($LicenseExitCode -ne 0) {
+            throw "sdkmanager --licenses failed in the Wemaps user-local SDK with exit code $LicenseExitCode."
+        }
+
+        Write-Host "Retrying package installation in: $SdkRoot"
         $InstallMessages = @()
         & $SdkManager "--sdk_root=$SdkRoot" "platforms;$RequiredPlatform" "build-tools;$RequiredBuildTools" 2>&1 |
             Tee-Object -Variable InstallMessages | Out-Host
