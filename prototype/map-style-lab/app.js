@@ -7,12 +7,12 @@
     background:"#100d18", residential:"#191424", park:"#19291f", water:"#142135",
     minor:"#655b7a", local:"#80709f", secondary:"#a18bc9", primary:"#b99ceb",
     trunk:"#c8a9eb", motorway:"#d1b7ff", casing:"#30243f",
-    buildingRoof:"#3a2e50", buildingSide:"#29213b"
+    buildingRoof:"#3a2e50", buildingOutline:"#29213b"
   };
   const PRESETS = {
     violet:{...DEFAULTS},
-    deep:{...DEFAULTS,background:"#090711",residential:"#13101d",park:"#14221d",water:"#101a2a",minor:"#514665",local:"#695982",secondary:"#806a9e",primary:"#987cba",trunk:"#aa8bcf",motorway:"#c2a1eb",casing:"#21192e",buildingRoof:"#2d2440",buildingSide:"#211a30"},
-    neon:{...DEFAULTS,background:"#100b19",residential:"#1b1428",park:"#18271f",water:"#132038",minor:"#765e91",local:"#9471b7",secondary:"#aa7ed2",primary:"#c18bea",trunk:"#ce96f4",motorway:"#e3b4ff",casing:"#392348",buildingRoof:"#49305e",buildingSide:"#2c203d"}
+    deep:{...DEFAULTS,background:"#090711",residential:"#13101d",park:"#14221d",water:"#101a2a",minor:"#514665",local:"#695982",secondary:"#806a9e",primary:"#987cba",trunk:"#aa8bcf",motorway:"#c2a1eb",casing:"#21192e",buildingRoof:"#2d2440",buildingOutline:"#211a30"},
+    neon:{...DEFAULTS,background:"#100b19",residential:"#1b1428",park:"#18271f",water:"#132038",minor:"#765e91",local:"#9471b7",secondary:"#aa7ed2",primary:"#c18bea",trunk:"#ce96f4",motorway:"#e3b4ff",casing:"#392348",buildingRoof:"#49305e",buildingOutline:"#2c203d"}
   };
   const STORAGE_KEY = "wemaps.violet-night.style-lab.v1";
   const $ = (selector) => document.querySelector(selector);
@@ -106,8 +106,8 @@
     if (!sourceId) return;
     const footprint = style.layers.find((layer) => layer["source-layer"] === "building" && layer.type === "fill");
     if (!footprint) return;
-    const firstRoad = style.layers.find((layer) => layer["source-layer"] === "transportation");
-    const firstSymbol = style.layers.find((layer) => layer.type === "symbol");
+    const footprintIndex = style.layers.findIndex((layer) => layer.id === footprint.id);
+    const nextLayer = style.layers[footprintIndex + 1];
     map.addLayer({
       id:"wemaps-building-3d",type:"fill-extrusion",source:sourceId,"source-layer":"building",minzoom:14,
       paint:{
@@ -117,7 +117,7 @@
         "fill-extrusion-opacity":buildingOpacity,
         "fill-extrusion-vertical-gradient":true
       }
-    },firstRoad ? firstRoad.id : (firstSymbol ? firstSymbol.id : undefined));
+    },nextLayer ? nextLayer.id : undefined);
   }
   function applyStyle() {
     if (!map || !map.isStyleLoaded()) return;
@@ -164,7 +164,7 @@
           return;
         }
         if (layer.type === "fill" && sourceLayer === "building") {
-          map.setPaintProperty(layer.id,"fill-color",palette.buildingSide);
+          map.setPaintProperty(layer.id,"fill-color",palette.buildingOutline);
           map.setPaintProperty(layer.id,"fill-outline-color",palette.buildingRoof);
           return;
         }
