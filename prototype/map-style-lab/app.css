@@ -45,7 +45,7 @@ input[type=range]::-moz-range-thumb{width:10px;height:10px;background:#d18aff;bo
 .button-primary:hover{filter:brightness(1.08);transform:translateY(-1px)}.button-primary span{margin-right:6px;font-size:14px;vertical-align:-1px}
 .footer-actions{display:flex;justify-content:space-between;margin-top:9px}.text-button{border:0;padding:4px 0;background:transparent;color:#9b8bac;font-size:9px}
 .text-button:hover{color:#dbb4ff}.footer-note{color:#655b72;font-size:8.5px;line-height:1.45;margin-top:9px}
-.map-stage{position:relative;min-width:0;background:#100d18;overflow:hidden}#map{position:absolute;inset:0;background:#100d18}
+.map-stage{position:relative;min-width:0;background:#100d18;overflow:hidden}#map{position:absolute;inset:0;background:#100d18}#map .maplibregl-canvas-container,#map canvas.maplibregl-canvas{background-color:#100d18}
 .map-topbar{position:absolute;z-index:3;top:16px;left:17px;right:17px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
 .map-badge,.map-top-actions{pointer-events:auto;background:rgba(19,15,28,.88);border:1px solid rgba(204,174,238,.17);box-shadow:0 8px 24px rgba(0,0,0,.2);backdrop-filter:blur(14px)}
 .map-badge{border-radius:10px;color:#c9bdd8;padding:9px 12px;font-size:10px;display:flex;align-items:center;gap:8px}
