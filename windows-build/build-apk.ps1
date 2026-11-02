@@ -21,6 +21,42 @@ function Invoke-SetupHelper {
     }
 }
 
+function Set-ProjectSdkDirectory {
+    param([string]$SdkRoot)
+
+    # Android Gradle Plugin reads sdk.dir from local.properties before relying
+    # on ANDROID_HOME/ANDROID_SDK_ROOT. Keep that file aligned with the SDK
+    # resolved by this builder, especially when a user-local fallback is used.
+    $LocalPropertiesPath = Join-Path $ProjectRoot 'local.properties'
+    $ExistingLines = @()
+    if (Test-Path -LiteralPath $LocalPropertiesPath -PathType Leaf) {
+        $ExistingLines = @(Get-Content -LiteralPath $LocalPropertiesPath -ErrorAction Stop)
+    }
+
+    $EscapedSdkRoot = $SdkRoot.Replace('\', '\\')
+    $NewLines = New-Object 'System.Collections.Generic.List[string]'
+    $SdkLineWritten = $false
+    foreach ($Line in $ExistingLines) {
+        if ([string]$Line -match '^\s*sdk\.dir\s*=') {
+            if (-not $SdkLineWritten) {
+                $NewLines.Add("sdk.dir=$EscapedSdkRoot")
+                $SdkLineWritten = $true
+            }
+        } else {
+            $NewLines.Add([string]$Line)
+        }
+    }
+    if (-not $SdkLineWritten) {
+        $NewLines.Add("sdk.dir=$EscapedSdkRoot")
+    }
+
+    [IO.File]::WriteAllLines(
+        $LocalPropertiesPath,
+        $NewLines.ToArray(),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+
 $ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $ProjectRoot
 
@@ -54,7 +90,9 @@ try {
 
     $env:ANDROID_SDK_ROOT = $ResolvedSdk
     $env:ANDROID_HOME = $ResolvedSdk
-    Write-Host "Using existing Android SDK: $ResolvedSdk"
+    Set-ProjectSdkDirectory -SdkRoot $ResolvedSdk
+    Write-Host "Using Android SDK: $ResolvedSdk"
+    Write-Host 'Updated project local.properties to use the resolved SDK.'
     Write-Host ''
 
     $GradleWrapper = Join-Path $ProjectRoot 'gradlew.bat'
