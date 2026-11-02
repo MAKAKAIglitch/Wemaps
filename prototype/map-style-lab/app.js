@@ -468,7 +468,7 @@
       const pixelsPerMeter = (512 * Math.pow(2, zoom)) / circumferenceAtLatitude;
       expression.push(zoom, [
         "*",
-        ["+", ["*", physicalWidthMeters, multiplier], extraMeters],
+        ["+", ["*", physicalWidthMeters, multiplier, roadWidthScale], extraMeters * roadWidthScale],
         pixelsPerMeter,
         widthFactor
       ]);
