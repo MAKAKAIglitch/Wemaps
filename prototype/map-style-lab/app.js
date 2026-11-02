@@ -262,7 +262,13 @@
     $("#zoomValue").textContent = zoom.toFixed(1);
     const targetPitch = getVisibleWidthKm(zoom) > AUTO_2D_WIDTH_KM ? 0 : preferredPitch;
     map.easeTo({ pitch: targetPitch, zoom: zoom, duration: 220 });
-    refreshAdaptiveCamera(false, zoom);
+    const flatView = targetPitch < 1;
+    $("#pitchValue").textContent = flatView && getVisibleWidthKm(zoom) > AUTO_2D_WIDTH_KM
+      ? "0° · авто"
+      : String(Math.round(targetPitch)) + "°";
+    $("#view2d").classList.toggle("selected", flatView);
+    $("#view3d").classList.toggle("selected", !flatView);
+    syncBuildingVisibility(flatView);
     saveSettings();
   }
 
@@ -395,6 +401,7 @@
       saveSettings();
     });
     map.on("resize",() => refreshAdaptiveCamera(false));
+    map.on("pitchend",() => refreshAdaptiveCamera(true));
     map.on("error",(event) => {
       const message = event && event.error && event.error.message ? event.error.message : "Неизвестная ошибка загрузки карты";
       console.warn("MapLibre error:",message);
