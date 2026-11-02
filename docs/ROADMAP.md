@@ -25,6 +25,8 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Open directly into the map.
 - [ ] Implement the compact bottom dock.
 - [ ] Add basic zoom, rotation, recenter, and compass controls.
+- [x] Add a close-zoom, viewport-bounded OSM lane-divider prototype using Overpass and lane counts where available.
+- [x] Keep explicit `lane_markings=no` roads free of generated lane separators and visually distinguish tagged marking presence from schematic guides.
 - [ ] Prototype detailed road lanes at close zoom levels using lane counts, directional lane counts, and turn-lane attributes where available.
 - [ ] Render lane separators and per-lane direction arrows without claiming generated geometry is surveyed road paint.
 - [ ] Verify that the selected vector-tile source exposes the required road and lane attributes.
@@ -33,8 +35,9 @@ This roadmap describes intended development order. It contains no delivery dates
 
 ## Stage 2 — 3D map quality
 
-- [ ] Enable a tilted perspective camera by default.
-- [ ] Add building extrusion using available building attributes.
+- [x] Enable a tilted perspective camera by default.
+- [x] Add building extrusion using available building attributes.
+- [x] Make the initial 3D building layer and footprints opaque with stronger map-palette contrast.
 - [ ] Define zoom-dependent building and label detail.
 - [ ] Tune road hierarchy and route color tokens.
 - [ ] Profile GPU, memory, battery, and frame pacing on real Android devices.
@@ -51,6 +54,7 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Add zoom-dependent road widths and geometry detail.
 - [ ] Highlight route-compatible lanes in bright white and other lanes in muted grey when route guidance is available, using Wemaps' own route-aware lane-guidance design.
 - [ ] Ensure lane separators remain legible without pretending unmapped markings are source data.
+- [x] Implement viewport-bounded, rate-limited Overpass retrieval for the initial OSM lane-divider overlay.
 - [ ] Implement viewport-bounded, incremental vector-tile loading.
 - [ ] Cancel obsolete requests and deduplicate features across tile boundaries.
 - [ ] Move parsing and spatial indexing off the UI thread.
@@ -60,8 +64,9 @@ This roadmap describes intended development order. It contains no delivery dates
 
 ## Stage 3 — Device location
 
-- [ ] Add runtime location permission flow.
-- [ ] Show current position and accuracy state.
+- [x] Add foreground-only runtime permission flow for approximate and precise location.
+- [x] Show the current device position with a geographic pointer on the map.
+- [ ] Show a visible location-accuracy state.
 - [ ] Implement follow mode and smooth camera tracking.
 - [ ] Show GPS-derived speed with quality checks.
 - [ ] Handle stale or unavailable location updates.
