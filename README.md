@@ -142,7 +142,7 @@ The Android application is still at the specification stage. A separate local br
 
 ### Local map style prototype
 
-A Windows-friendly browser editor is available in [prototype/map-style-lab](prototype/map-style-lab/README.md). It runs on localhost with Python's standard library, loads the original OpenFreeMap Liberty style and applies the custom Violet Night palette over it, with animated 2D/3D transitions, dark roads with high-contrast lane markings, close-zoom road-width polygons built from explicit OSM width tags, raised bridge and ramp treatments, OSM speed-camera and motorway-junction overlays, 3D buildings, zoom-gated woodland symbols, dark sand-colored beaches, bounded/cached Overpass requests, and MapLibre Style JSON export. It does not require a Wemaps server.
+A Windows-friendly browser editor is available in [prototype/map-style-lab](prototype/map-style-lab/README.md). It runs on localhost with Python's standard library, loads the original OpenFreeMap Liberty style and applies the custom Violet Night palette over it, with animated 2D/3D transitions, dark roads with high-contrast lane markings, close-zoom road-width polygons built from explicit OSM width tags, raised bridge and ramp treatments, independent OSM camera and road-data requests, 3D buildings, zoom-gated woodland symbols, dark sand-colored beaches, bounded/cached Overpass requests, and MapLibre Style JSON export. It does not require a Wemaps server.
 
 See:
 
