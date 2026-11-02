@@ -40,7 +40,7 @@ object DeviceLocationMarker {
                 PropertyFactory.iconSize(0.78f),
                 PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
                 PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
-                PropertyFactory.iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_MAP),
+                PropertyFactory.iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
                 PropertyFactory.iconAllowOverlap(true),
                 PropertyFactory.iconIgnorePlacement(true)
             )
