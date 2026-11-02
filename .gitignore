@@ -29,3 +29,6 @@ keystore.properties
 # OS/editor files
 .DS_Store
 Thumbs.db
+
+# Local Windows build log
+build-windows.log
