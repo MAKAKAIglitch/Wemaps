@@ -1370,22 +1370,25 @@
       bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()
     ].map((value) => value.toFixed(5)).join(",");
     const includeRoadGeometry = map.getZoom() >= ROAD_DATA_MIN_ZOOM;
-    const query = [
+    const queryParts = [
       "[out:json][timeout:10];",
       "(",
       'node["highway"="speed_camera"](' + bbox + ");",
       'nwr["man_made"="surveillance"]["surveillance:type"~"^(camera|ALPR)$"]["surveillance:zone"~"^(traffic|road|street|motorway)$"](' + bbox + ");",
-      'node["highway"="motorway_junction"](' + bbox + ");",
-      ...(includeRoadGeometry ? [
+      'node["highway"="motorway_junction"](' + bbox + ");"
+    ];
+    if (includeRoadGeometry) {
+      queryParts.push(
         'way["highway"]["width"](' + bbox + ");",
         'way["highway"]["width:effective"](' + bbox + ");",
         'way["highway"]["width:carriageway"](' + bbox + ");",
-        'way["highway"]["lanes"](' + bbox + ");',
-        'way["highway"]["lanes:forward"](' + bbox + ");',
-        'way["highway"]["lanes:backward"](' + bbox + ");'
-      ] : []),
-      ");out center geom tags;"
-    ].join("");
+        'way["highway"]["lanes"](' + bbox + ");",
+        'way["highway"]["lanes:forward"](' + bbox + ");",
+        'way["highway"]["lanes:backward"](' + bbox + ");"
+      );
+    }
+    queryParts.push(");out center geom tags;");
+    const query = queryParts.join("");
 
     osmOverlayStatus(includeRoadGeometry
       ? "OSM · камеры и размеченная ширина дорог…"
@@ -1428,9 +1431,7 @@
       );
     } catch (error) {
       if (error.name === "AbortError") {
-        if (serial === osmRequestSerial) {
-          osmOverlayStatus("OSM · запрос превысил 12 секунд");
-        }
+        if (serial === osmRequestSerial) osmOverlayStatus("OSM · запрос превысил 12 секунд");
         return;
       }
       console.warn("OpenStreetMap live overlays:", error);
