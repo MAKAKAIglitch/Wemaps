@@ -347,6 +347,10 @@ class OsmLaneMarkingsOverlay(
     }
 
     private fun clearLayers() {
+        // Invalidate an in-flight response so it cannot redraw markings after zooming out.
+        generation.incrementAndGet()
+        lastBounds = null
+        lastRequestAt = 0L
         (style.getSource(MAPPED_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(EMPTY_COLLECTION)
         (style.getSource(SCHEMATIC_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(EMPTY_COLLECTION)
     }
