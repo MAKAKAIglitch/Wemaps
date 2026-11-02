@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 1,
+  "defaultPreset": "waze-inspired-dark",
+  "presets": {
+    "waze-inspired-dark": {
+      "label": "Waze-inspired Dark",
+      "description": "Initial dark navy and blue-grey map palette inspired by Waze night-map styling. These are Wemaps values, not official Waze design tokens.",
+      "colors": {
+        "map.background": "#182330",
+        "map.land": "#202D3C",
+        "map.urban": "#263649",
+        "map.water": "#10283D",
+        "road.casing": "#172433",
+        "road.minor": "#35495E",
+        "road.local": "#455D75",
+        "road.secondary": "#58738D",
+        "road.primary": "#718DA8",
+        "road.major": "#91A9C0",
+        "building.side": "#26374A",
+        "building.roof": "#354B61",
+        "route.outline": "#54227C",
+        "route.main": "#B65CE8",
+        "route.highlight": "#E5B8FF",
+        "lane.selected": "#F4F7FC",
+        "lane.other": "#8795A5",
+        "lane.arrow": "#F4F7FC",
+        "road.marking": "#DCE5EE",
+        "road.marking.muted": "#8999A9",
+        "label.primary": "#E8F0F7",
+        "label.secondary": "#AFC1D0"
+      }
+    },
+    "violet-night": {
+      "label": "Violet Night",
+      "description": "Alternative purple map palette retained for future use.",
+      "colors": {
+        "map.background": "#100D18",
+        "map.land": "#171321",
+        "map.urban": "#191424",
+        "map.water": "#142135",
+        "road.casing": "#100D18",
+        "road.minor": "#655B7A",
+        "road.local": "#80709F",
+        "road.secondary": "#A18BC9",
+        "road.primary": "#B99CEB",
+        "road.major": "#D1B7FF",
+        "building.side": "#29213B",
+        "building.roof": "#3A2E50",
+        "route.outline": "#7139BA",
+        "route.main": "#D18AFF",
+        "route.highlight": "#F4DEFF",
+        "lane.selected": "#F4F7FC",
+        "lane.other": "#8795A5",
+        "lane.arrow": "#F4F7FC",
+        "road.marking": "#F0EAF8",
+        "road.marking.muted": "#B9A8D7",
+        "label.primary": "#F0EAF8",
+        "label.secondary": "#B9A8D7"
+      }
+    }
+  },
+  "customOverrides": {
+    "description": "Optional user-defined semantic color overrides. Empty by default. Unknown token names must be ignored safely.",
+    "colors": {}
+  },
+  "notes": [
+    "Map layers must reference semantic tokens rather than embedding color literals.",
+    "Changing a preset or custom token must not change map geometry, OSM data, or rendering algorithms.",
+    "Lane compatibility colors are used only when route and lane matching data are available.",
+    "Mapped physical road width, estimated width, and renderer fallback width are separate data states."
+  ]
+}
