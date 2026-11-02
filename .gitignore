@@ -32,3 +32,4 @@ Thumbs.db
 
 # Local Windows build log
 build-windows.log
+build-windows-retry.log
