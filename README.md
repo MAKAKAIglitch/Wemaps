@@ -20,26 +20,14 @@ Build an Android navigator that combines:
 
 The initial product is an online-first Android client. It will use compatible third-party data services through replaceable provider interfaces. The project does not require its own tile-processing or application backend for the first development stages.
 
-## Visual identity: Violet Night
+## Map appearance
 
-Violet Night is the visual design system for the map and navigation experience.
+The first visible map prototype uses an editable **Waze-inspired dark palette**: deep navy/blue-grey backgrounds and roads, restrained road hierarchy, and a strongly contrasting route. Initial color tokens are documented in [the product specification](docs/PRODUCT_SPEC.md). These values are a visual approximation, not official Waze design constants or copied Waze assets.
 
-| Map element | Initial color |
-| --- | --- |
-| Deep map background | `#100D18` |
-| Built-up areas | `#191424` |
-| Minor roads | `#655B7A` |
-| Local streets | `#80709F` |
-| Secondary roads | `#A18BC9` |
-| Primary roads | `#B99CEB` |
-| Major roads | `#D1B7FF` |
-| Building sides | `#29213B` |
-| Building roofs | `#3A2E50` |
-| Route outline | `#7139BA` |
-| Route line | `#D18AFF` |
-| Route highlight | `#F4DEFF` |
+All map colors must be centralized in editable style tokens. The style system must support named presets and custom overrides. The earlier **Violet Night** purple palette remains a separate preset for future experimentation. Changing the active palette must not require rewriting map layers or rendering logic.
 
-The palette is a starting specification. It may be refined after real-device readability, contrast, and performance testing. Road hierarchy must remain understandable without relying on color alone.
+Detailed lane rendering is a core map requirement. At close zoom levels, show individual lanes, visible separators, and direction arrows where OSM attributes support them. Once route guidance exists, highlight route-compatible lanes in bright white and mute other lanes in grey, following the general lane-guidance pattern documented by Yandex Navigator. Do not present generated lane geometry as surveyed road markings.
+
 
 ## Main experience
 
