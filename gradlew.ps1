@@ -91,12 +91,18 @@ Get-ChildItem Env: -ErrorAction SilentlyContinue |
         Add-JavaHomeCandidate -Path $_.Value -Source $_.Name
     }
 
-# Resolve java.exe from PATH, including installations configured by package managers.
-$PathJava = Get-Command "java.exe" -CommandType Application -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-if ($PathJava -and $PathJava.Source) {
-    $JavaBin = Split-Path -Parent $PathJava.Source
-    Add-JavaHomeCandidate -Path (Split-Path -Parent $JavaBin) -Source "PATH"
+# Search PATH entries directly instead of relying on Get-Command metadata,
+# which differs between Windows PowerShell 5.1 and PowerShell 7.
+foreach ($PathEntry in ($env:PATH -split [regex]::Escape([System.IO.Path]::PathSeparator))) {
+    if ([string]::IsNullOrWhiteSpace($PathEntry)) {
+        continue
+    }
+
+    $PathJavaExe = Join-Path $PathEntry.Trim('"') "java.exe"
+    if (Test-Path -LiteralPath $PathJavaExe -PathType Leaf) {
+        $JavaBin = Split-Path -Parent $PathJavaExe
+        Add-JavaHomeCandidate -Path (Split-Path -Parent $JavaBin) -Source "PATH"
+    }
 }
 
 # Common machine-wide JDK and Android Studio installation locations.
@@ -149,15 +155,16 @@ if ($env:USERPROFILE) {
 $SelectedJava = $null
 foreach ($Candidate in $JavaCandidates) {
     $JavaExe = Join-Path $Candidate.Home "bin\java.exe"
-    $VersionOutput = (& $JavaExe -XshowSettings:properties -version 2>&1 | Out-String)
+    $VersionOutput = (& $JavaExe -version 2>&1 | Out-String)
+    Write-Host "Checking JDK candidate: $($Candidate.Home) ($($Candidate.Source))"
 
-    $VersionMatch = [regex]::Match(
-        $VersionOutput,
-        'java\.specification\.version\s*=\s*([0-9]+(?:\.[0-9]+)*)'
-    )
-
+    # The standard version banner is consistent across OpenJDK distributions.
+    $VersionMatch = [regex]::Match($VersionOutput, 'version\s+"([^"]+)"')
     if (-not $VersionMatch.Success) {
-        $VersionMatch = [regex]::Match($VersionOutput, 'version\s+"([^"]+)"')
+        $VersionMatch = [regex]::Match(
+            $VersionOutput,
+            'java\.specification\.version\s*=\s*([0-9]+(?:\.[0-9]+)*)'
+        )
     }
 
     if (-not $VersionMatch.Success) {
