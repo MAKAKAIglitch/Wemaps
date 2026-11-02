@@ -91,11 +91,13 @@ Linux / macOS:
 ./gradlew :app:assembleDebug
 ```
 
-Windows:
+Windows — дважды нажми `build-windows.bat` или запусти:
 
 ```bat
-gradlew.bat :app:assembleDebug
+build-windows.bat
 ```
+
+Батник ищет Android SDK через `ANDROID_SDK_ROOT`, `ANDROID_HOME`, файл проекта `local.properties` или стандартный каталог Android Studio. Затем он запускает Gradle, оставляет окно открытым после сборки, сохраняет вывод в `build-windows.log` и копирует готовый APK в корень репозитория под именем `Wemaps-debug.apk`.
 
 Windows-лаунчер автоматически ищет подходящий JDK в `JAVA_HOME`, `JDK_HOME`, `PATH`, встроенной JBR-среде Android Studio, JDK от JetBrains Toolbox и стандартных каталогах установки. Сам JDK 17 или новее должен быть установлен, но вручную прописывать `JAVA_HOME` обычно не требуется. Скрипт также загружает закреплённую версию Gradle и проверяет её SHA-256 перед запуском.
 
