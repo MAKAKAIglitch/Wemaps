@@ -142,7 +142,7 @@ The Android application is still at the specification stage. A separate local br
 
 ### Local map style prototype
 
-A Windows-friendly browser editor is available in [prototype/map-style-lab](prototype/map-style-lab/README.md). It runs on localhost with Python's standard library, loads vector tiles from OpenFreeMap, supports live color and 3D-building adjustments, and exports a MapLibre Style JSON file. It does not require a Wemaps server.
+A Windows-friendly browser editor is available in [prototype/map-style-lab](prototype/map-style-lab/README.md). It runs on localhost with Python's standard library, loads vector tiles from OpenFreeMap, supports live road hierarchy and width tuning, layered road depth and markings, brighter 3D buildings using mapped height attributes, zoom-gated woodland symbols, dark sand-colored beaches, and exports a MapLibre Style JSON file. It does not require a Wemaps server.
 
 See:
 
