@@ -42,7 +42,7 @@ The initial map center is a neutral sample view in central Berlin. Drag the map 
 Use the color pickers to adjust the Violet Night palette. The map is restyled live.
 
 - Road hierarchy: each road class gets a separate color, while road casings use their own darker color.
-- 3D buildings: roof color, side color, opacity, and visual height multiplier.
+- 3D buildings: main extrusion color, footprint outline, opacity, and visual height multiplier.
 - Camera: pitch and zoom sliders, plus quick 2D/3D buttons.
 - Presets: Violet Night, Deep Purple, and Neon Violet.
 - Export: downloads wemaps-violet-night.style.json.
@@ -54,6 +54,7 @@ The exported style retains its underlying vector source, glyph, sprite, and tile
 
 - The prototype uses a third-party style/data service. Availability, coverage, update frequency, and terms are controlled by that provider.
 - 3D building quality depends on the building data and height attributes available in each area.
+- The extrusion color is shared by roof and walls; MapLibre's vertical gradient shades the sides. The footprint outline is controlled separately. The height multiplier is a visual preview control, not a change to source building measurements.
 - Some road styles have multiple casing, bridge, and tunnel layers. The editor changes them by inspecting the layer source and filter; inspect the exported JSON before using it in production.
 - This prototype does not implement route calculation, GPS tracking, speed limits, camera alerts, search, or weather.
 - It does not download offline areas.
