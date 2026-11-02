@@ -76,7 +76,7 @@ The normal presentation remains perspective 3D. A user-accessible fallback may b
 
 ## 4. 3D cartography
 
-The map should distinguish bridge decks, tunnels, and motorway ramps/interchange branches when the provider exposes OSM-derived `brunnel` and `ramp` attributes. Road widths should use mapped `width` or lane data when available, with estimates clearly distinguished where the vector schema omits those tags.
+The map should distinguish bridge decks, tunnels, and motorway ramps/interchange branches when the provider exposes OSM-derived `brunnel` and `ramp` attributes. Use explicit OSM `width`, `width:carriageway`, or `width:effective` values to render real-world road width where mapped. Lane-count tags may position lane dividers but must not be presented as measured road width. If width tags are absent, use a clearly identified class-based visual estimate.
 
 Use MapLibre Native Android for GPU-accelerated vector map rendering.
 
