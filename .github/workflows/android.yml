@@ -132,6 +132,17 @@ jobs:
             $_ -notlike '*\platform-tools' -and $_ -notlike '*\cmdline-tools\*\bin'
           }) -join ';'
 
+          # Regression test: PATH may retain a stale entry for an unplugged drive.
+          $env:JAVA_HOME = ""
+          $occupiedDrives = [System.IO.Directory]::GetLogicalDrives()
+          $missingDrive = [char[]](65..90) | Where-Object {
+            $occupiedDrives -notcontains ("$_" + ":\")
+          } | Select-Object -First 1
+          if (-not $missingDrive) { throw "Could not find an unused drive letter for stale-PATH regression test." }
+          $stalePathEntry = "$missingDrive" + ":stale-jdkin"
+          $env:PATH = "$stalePathEntry;$env:PATH"
+          Write-Host "Testing Java discovery with an unavailable drive in PATH: $stalePathEntry"
+
           $wrapperPath = Join-Path $env:GITHUB_WORKSPACE "gradlew.bat"
           $originalWrapper = [System.IO.File]::ReadAllText($wrapperPath)
           $apkDirectory = Join-Path $env:GITHUB_WORKSPACE "app\build\outputs\apk\debug"
