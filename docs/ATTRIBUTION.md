@@ -80,7 +80,7 @@ Important examples include:
 
 The presence and completeness of these tags vary by region. Missing direction must remain unknown rather than being guessed.
 
-## 6. Provider review checklist
+## 7. Provider review checklist
 
 Before adding any external provider, document:
 
@@ -95,7 +95,7 @@ Before adding any external provider, document:
 - Retention, analytics, and privacy information.
 - Availability expectations and fallback behavior.
 
-## 7. Release checklist
+## 8. Release checklist
 
 Before publishing a build:
 
