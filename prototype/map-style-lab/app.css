@@ -51,10 +51,11 @@ input[type=range]::-moz-range-thumb{width:10px;height:10px;background:#d18aff;bo
 .map-badge{border-radius:10px;color:#c9bdd8;padding:9px 12px;font-size:10px;display:flex;align-items:center;gap:8px}
 .map-top-actions{border-radius:10px;padding:4px;display:flex;gap:3px}.map-action{min-width:34px;height:29px;padding:0 9px;border:0;border-radius:7px;color:#a99abf;background:transparent;font-size:10px;font-weight:700}
 .map-action:hover,.map-action.selected{color:#f2e7ff;background:#49305f}
-.map-bottom-left{position:absolute;z-index:2;bottom:52px;left:20px;pointer-events:none;text-shadow:0 2px 10px #090710}
+.map-bottom-left{position:absolute;z-index:2;bottom:78px;left:20px;pointer-events:none;text-shadow:0 2px 10px #090710}
 .map-title{font-size:16px;font-weight:750;letter-spacing:-.35px;color:#f1eafa}.map-title span{color:#bd88e8;padding:0 3px}
 .map-subtitle{font-size:8px;letter-spacing:1.5px;color:#b6a5ca;margin-top:4px}
 .map-hint{position:absolute;z-index:2;right:20px;bottom:22px;color:rgba(241,234,250,.72);font-size:9px;background:rgba(18,14,26,.7);border:1px solid rgba(204,174,238,.12);padding:8px 10px;border-radius:8px;pointer-events:none;backdrop-filter:blur(8px)}
+.map-feature-status{position:absolute;z-index:3;left:17px;bottom:17px;max-width:min(360px,calc(100% - 34px));padding:8px 11px;border-radius:9px;background:rgba(19,15,28,.88);border:1px solid rgba(255,190,160,.22);color:#f4d4c4;font-size:9px;letter-spacing:.15px;box-shadow:0 8px 22px rgba(0,0,0,.24);backdrop-filter:blur(12px);pointer-events:none}.wemaps-popup{min-width:150px;color:#21182a;font:12px/1.5 Inter,"Segoe UI",sans-serif}.wemaps-popup strong{display:block;margin-bottom:5px;font-size:13px}.wemaps-popup div{color:#5c4c68}
 .map-error{position:absolute;z-index:10;left:50%;top:50%;transform:translate(-50%,-50%);width:min(480px,calc(100% - 40px));background:rgba(29,18,37,.96);border:1px solid rgba(255,130,160,.4);border-radius:13px;padding:18px;color:#f3dce8;font-size:12px;line-height:1.55;box-shadow:0 16px 50px rgba(0,0,0,.35)}
 .maplibregl-ctrl-top-right{top:58px;right:16px}.maplibregl-ctrl-group{background:rgba(24,18,34,.9)!important;border:1px solid rgba(204,174,238,.2)!important;box-shadow:0 6px 20px rgba(0,0,0,.2)!important;overflow:hidden}
 .maplibregl-ctrl-group button{filter:invert(.86) sepia(.16) saturate(.5) hue-rotate(225deg)}
