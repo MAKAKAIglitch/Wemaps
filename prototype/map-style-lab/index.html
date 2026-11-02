@@ -56,7 +56,7 @@
             <label class="color-row"><span class="swatch" data-swatch="motorway"></span><span class="color-name">Автомагистрали</span><input data-color="motorway" type="color" value="#896ba6"><code>#896BA6</code></label>
             <label class="color-row"><span class="swatch" data-swatch="casing"></span><span class="color-name">Обводка дорог</span><input data-color="casing" type="color" value="#21192d"><code>#21192D</code></label>
           </div>
-          <div class="range-control"><div class="range-label"><label for="roadWidth">Общая толщина дорог</label><output id="roadWidthValue">112%</output></div><input id="roadWidth" type="range" min="85" max="145" value="112"><div class="control-hint">Ширина зависит от класса дороги и масштаба. Пунктир — визуальная разметка, не точное число полос.</div></div>
+          <div class="range-control"><div class="range-label"><label for="roadWidth">Масштаб базовой ширины</label><output id="roadWidthValue">112%</output></div><input id="roadWidth" type="range" min="85" max="145" value="112"><div class="control-hint">Ползунок меняет только базовый стиль. Точные контуры ширины строятся из OSM width* при приближении 16.5+; без такого тега остаётся оценка по классу дороги.</div></div>
         </section>
 
         <section class="control-section">
