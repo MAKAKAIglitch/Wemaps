@@ -72,4 +72,10 @@ jobs:
           Get-ChildItem Env: -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -like "JAVA_HOME_*" } |
             ForEach-Object { Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue }
+
+          Write-Host "Java executable resolved from PATH:"
+          Get-Command java.exe -ErrorAction Stop | Format-List Name,Path,Source,Definition
+          java.exe -version
+          javac.exe -version
+
           .\gradlew.bat --version
