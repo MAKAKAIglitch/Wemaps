@@ -38,6 +38,9 @@
             <label class="color-row"><span class="swatch" data-swatch="residential"></span><span class="color-name">Застройка</span><input data-color="residential" type="color" value="#191424"><code>#191424</code></label>
             <label class="color-row"><span class="swatch" data-swatch="park"></span><span class="color-name">Парки и зелень</span><input data-color="park" type="color" value="#19291f"><code>#19291F</code></label>
             <label class="color-row"><span class="swatch" data-swatch="water"></span><span class="color-name">Вода</span><input data-color="water" type="color" value="#142135"><code>#142135</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="beach"></span><span class="color-name">Пляж и песок</span><input data-color="beach" type="color" value="#70562c"><code>#70562C</code></label>
+          </div>
+          <div class="control-hint">Миниатюрные кроны появляются только при сильном приближении. Вид деревьев зависит от доступных тегов растительности.
           </div>
         </section>
 
@@ -52,21 +55,22 @@
             <label class="color-row"><span class="swatch" data-swatch="motorway"></span><span class="color-name">Автомагистрали</span><input data-color="motorway" type="color" value="#d1b7ff"><code>#D1B7FF</code></label>
             <label class="color-row"><span class="swatch" data-swatch="casing"></span><span class="color-name">Обводка дорог</span><input data-color="casing" type="color" value="#30243f"><code>#30243F</code></label>
           </div>
+          <div class="range-control"><div class="range-label"><label for="roadWidth">Общая толщина дорог</label><output id="roadWidthValue">112%</output></div><input id="roadWidth" type="range" min="85" max="145" value="112"><div class="control-hint">Ширина зависит от класса дороги и масштаба карты.</div></div>
         </section>
 
         <section class="control-section">
           <div class="section-heading"><div><span class="section-index">03</span><h2>Здания 3D</h2></div><span class="section-note">FILL EXTRUSION</span></div>
           <div class="color-list">
-            <label class="color-row"><span class="swatch" data-swatch="buildingRoof"></span><span class="color-name">Основной цвет 3D</span><input data-color="buildingRoof" type="color" value="#3a2e50"><code>#3A2E50</code></label>
-            <label class="color-row"><span class="swatch" data-swatch="buildingSide"></span><span class="color-name">Контур оснований</span><input data-color="buildingSide" type="color" value="#29213b"><code>#29213B</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="buildingRoof"></span><span class="color-name">Основной цвет 3D</span><input data-color="buildingRoof" type="color" value="#51436a"><code>#51436A</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="buildingSide"></span><span class="color-name">Контур оснований</span><input data-color="buildingOutline" type="color" value="#342842"><code>#342842</code></label>
           </div>
-          <div class="range-control"><div class="range-label"><label for="buildingOpacity">Непрозрачность</label><output id="buildingOpacityValue">92%</output></div><input id="buildingOpacity" type="range" min="35" max="100" value="92"></div>
-          <div class="range-control"><div class="range-label"><label for="buildingHeight">Масштаб высоты</label><output id="buildingHeightValue">1.0×</output></div><input id="buildingHeight" type="range" min="60" max="180" value="100"></div>
+          <div class="range-control"><div class="range-label"><label for="buildingOpacity">Непрозрачность</label><output id="buildingOpacityValue">92%</output></div><input id="buildingOpacity" type="range" min="35" max="100" value="96"></div>
+          <div class="control-hint">Используется высота из данных здания (render_height / height). Искусственное увеличение высоты отключено.</div>
         </section>
 
         <section class="control-section">
           <div class="section-heading"><div><span class="section-index">04</span><h2>Камера</h2></div><span class="section-note">3D VIEW</span></div>
-          <div class="range-control"><div class="range-label"><label for="pitch">Наклон в режиме 3D</label><output id="pitchValue">58°</output></div><input id="pitch" type="range" min="0" max="75" value="58"><div class="control-hint">При ширине обзора более 5 км карта автоматически переключается в 2D.</div></div>
+          <div class="range-control"><div class="range-label"><label for="pitch">Наклон в режиме 3D</label><output id="pitchValue">73°</output></div><input id="pitch" type="range" min="0" max="80" value="73"><div class="control-hint">При ширине обзора более 5 км карта автоматически переключается в 2D.</div></div>
           <div class="range-control"><div class="range-label"><label for="zoom">Масштаб</label><output id="zoomValue">15.2</output></div><input id="zoom" type="range" min="5" max="19" step="0.1" value="15.2"></div>
           <div class="button-row"><button class="button button-secondary" id="resetCamera" type="button">Сбросить камеру</button><button class="button button-secondary" id="toggleBuildings" type="button">3D: включено</button></div>
         </section>
