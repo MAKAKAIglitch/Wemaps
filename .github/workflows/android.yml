@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-build-${{ github.ref }}
+  group: android-build-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -73,7 +73,12 @@ jobs:
             Where-Object { $_.Name -like "JAVA_HOME_*" } |
             ForEach-Object { Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue }
 
-          Write-Host "Java executable resolved from PATH:"
+          Write-Host "JAVA_HOME: $env:JAVA_HOME"
+          Write-Host "Version-specific JAVA_HOME variables:"
+          Get-ChildItem Env:JAVA_HOME* -ErrorAction SilentlyContinue | Format-Table -AutoSize
+          Write-Host "PATH Java executable:"
+          where.exe java.exe
+          Write-Host "Resolved Java command:"
           Get-Command java.exe -ErrorAction Stop | Format-List Name,Path,Source,Definition
           java.exe -version
           javac.exe -version
