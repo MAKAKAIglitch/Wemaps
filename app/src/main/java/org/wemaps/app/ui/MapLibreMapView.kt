@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.wemaps.app.map.MapPalette
@@ -25,7 +26,7 @@ import org.wemaps.app.map.MapStyleConfigurer
 fun MapLibreMapView(
     palette: MapPalette,
     modifier: Modifier = Modifier,
-    onStyleReady: (buildingsAvailable: Boolean) -> Unit
+    onStyleReady: (map: MapLibreMap, buildingsAvailable: Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -97,22 +98,29 @@ fun MapLibreMapView(
         modifier = modifier
     )
 
-    LaunchedEffect(mapView, palette.buildingRoof) {
+    LaunchedEffect(mapView) {
         mapView.getMapAsync { map ->
+            map.uiSettings.isCompassEnabled = false
+            map.uiSettings.isRotateGesturesEnabled = true
+            map.uiSettings.isTiltGesturesEnabled = true
+            map.uiSettings.isZoomGesturesEnabled = true
+            map.uiSettings.isScrollGesturesEnabled = true
+
             map.setStyle(Style.Builder().fromUri(MapStyleConfig.styleUrl)) { style ->
                 val buildingsAvailable = MapStyleConfigurer.apply(style, palette)
 
                 map.moveCamera(
                     CameraUpdateFactory.newCameraPosition(
                         CameraPosition.Builder()
-                            // Neutral demo camera position until GNSS integration is added.
+                            // Neutral sample camera until on-device GNSS positioning is integrated.
                             .target(LatLng(52.517, 13.388))
                             .zoom(15.2)
                             .tilt(52.0)
+                            .bearing(0.0)
                             .build()
                     )
                 )
-                currentOnStyleReady(buildingsAvailable)
+                currentOnStyleReady(map, buildingsAvailable)
             }
         }
     }
