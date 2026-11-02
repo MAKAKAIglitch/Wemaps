@@ -1,0 +1,60 @@
+$ErrorActionPreference = 'Stop'
+$JavaExe = $null
+if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
+    $JavaExe = Join-Path $env:JAVA_HOME 'bin\java.exe'
+} else {
+    $Candidates = @(
+        (Join-Path $env:ProgramFiles 'Android\Android Studio\jbr\bin\java.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Android Studio\jbr\bin\java.exe')
+    )
+    $JavaExe = $Candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    if (-not $JavaExe) {
+        $Found = Get-Command java.exe -ErrorAction SilentlyContinue
+        if ($Found) { $JavaExe = $Found.Source }
+    }
+}
+if (-not $JavaExe) { throw 'JDK not found. Install Android Studio or JDK 17/21.' }
+# java -version writes to stderr on common JDKs. Capture both streams directly
+# so Windows PowerShell 5 does not treat the version banner as a fatal error.
+$ProcessInfo = New-Object System.Diagnostics.ProcessStartInfo
+$ProcessInfo.FileName = $JavaExe
+$ProcessInfo.Arguments = '-version'
+$ProcessInfo.UseShellExecute = $false
+$ProcessInfo.RedirectStandardOutput = $true
+$ProcessInfo.RedirectStandardError = $true
+$ProcessInfo.CreateNoWindow = $true
+$VersionProcess = New-Object System.Diagnostics.Process
+$VersionProcess.StartInfo = $ProcessInfo
+try {
+    if (-not $VersionProcess.Start()) { throw "Cannot start Java at $JavaExe" }
+    $VersionStdOut = $VersionProcess.StandardOutput.ReadToEnd()
+    $VersionStdErr = $VersionProcess.StandardError.ReadToEnd()
+    $VersionProcess.WaitForExit()
+    if ($VersionProcess.ExitCode -ne 0) { throw "java -version returned exit code $($VersionProcess.ExitCode) at $JavaExe" }
+    $VersionOutput = $VersionStdOut + [Environment]::NewLine + $VersionStdErr
+} finally {
+    $VersionProcess.Dispose()
+}
+$VersionMatch = [regex]::Match($VersionOutput, 'version\s+"([^"]+)"')
+if (-not $VersionMatch.Success) { throw "Cannot read Java version from $JavaExe" }
+$Version = $VersionMatch.Groups[1].Value
+$MajorText = ($Version -split '\.')[0]
+if ($MajorText -eq '1') { $MajorText = ($Version -split '\.')[1] }
+$Major = [int]$MajorText
+if ($Major -lt 17 -or $Major -gt 24) { throw "Unsupported Java $Version. Use JDK 17 or 21." }
+$Sdk = $env:ANDROID_SDK_ROOT
+if (-not $Sdk) { $Sdk = $env:ANDROID_HOME }
+if (-not $Sdk) { $Sdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
+if (-not (Test-Path (Join-Path $Sdk 'platforms\android-37.1\android.jar'))) {
+    throw "Android SDK Platform 37.1 not found at $Sdk. Install it from Android Studio SDK Manager."
+}
+$ToolsRoot = Join-Path $Sdk 'build-tools'
+$Tools = Join-Path $ToolsRoot '36.0.0'
+if (-not (Test-Path -LiteralPath (Join-Path $Tools 'aapt2.exe') -PathType Leaf) -or
+    -not (Test-Path -LiteralPath (Join-Path $Tools 'zipalign.exe') -PathType Leaf)) {
+    throw "Android SDK Build-Tools 36.0.0 not found or incomplete under $ToolsRoot."
+}
+Write-Host "Java: $Version"
+Write-Host "Android SDK: $Sdk"
+Write-Host "Build-Tools: $([IO.Path]::GetFileName($Tools))"
+Write-Host 'Environment checks passed.'
