@@ -109,8 +109,7 @@ jobs:
           Set-Content -Path (Join-Path $probeProject "local.properties") -Value "sdk.dir=$sdkForProperties" -Encoding ascii
 
           $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -notmatch '(?i)\\platform-tools\\?$|\\cmdline-tools\\[^\\]+\\bin\\?
-
+            $_ -notlike '*\platform-tools' -and $_ -notlike '*\cmdline-tools\*\bin'
           }) -join ';'
 
           $wrapperPath = Join-Path $env:GITHUB_WORKSPACE "gradlew.bat"
