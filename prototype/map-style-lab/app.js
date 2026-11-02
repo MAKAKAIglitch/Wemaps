@@ -327,7 +327,7 @@
     });
     $("#buildingHeight").addEventListener("input",(event) => {
       buildingHeightScale = Number(event.target.value)/100;
-      updateBuildingControls(); applyStyle(); saveSettings();
+      updateBuildingControls(); scheduleStyleUpdate(); saveSettings();
     });
     $("#pitch").addEventListener("input",updateCamera);
     $("#zoom").addEventListener("input",updateCamera);
