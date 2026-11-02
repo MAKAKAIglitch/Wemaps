@@ -39,6 +39,7 @@ This roadmap describes intended development order. It contains no delivery dates
 ## Stage 2A — Road cartography and loading performance
 
 - [ ] Define road casing, surface, and lane-marking styles for Violet Night.
+- [ ] Verify that the selected vector-tile provider exposes OSM physical-width and lane attributes; reject sources that strip required properties if accurate width rendering is a release requirement.
 - [ ] Use OSM physical-width and lane attributes where available.
 - [ ] Separate mapped width from estimated and renderer-fallback widths.
 - [ ] Add zoom-dependent road widths and geometry detail.
@@ -76,9 +77,15 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Normalize OSM maxspeed information.
 - [ ] Read mapped traffic-sign nodes where available.
 - [ ] Support conditional limits only when their conditions can be evaluated correctly.
+- [ ] Add a separate, replaceable CameraDataProvider independent from road-tile loading.
+- [ ] Fetch camera data only for the visible viewport/buffer or a bounded route corridor.
+- [ ] Debounce and cancel obsolete camera requests; ignore stale responses.
+- [ ] Cache camera data incrementally and query it through a spatial index.
+- [ ] Verify that a slow or failed camera provider never blocks the first map frame or road rendering.
 - [ ] Import fixed speed-camera objects.
 - [ ] Preserve roadside camera coordinates.
-- [ ] Read camera direction / bearing when mapped.
+- [ ] Read `direction=*` on `highway=speed_camera` and `camera:direction=*` on surveillance objects where mapped.
+- [ ] Treat `camera:angle=*` as vertical tilt, not horizontal field of view.
 - [ ] Interpret enforcement relations and affected road direction.
 - [ ] Add route-direction-aware warnings.
 - [ ] Distinguish unknown direction and incomplete data.
