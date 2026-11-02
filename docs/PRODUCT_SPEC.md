@@ -104,29 +104,30 @@ Road class must be communicated through a combination of line width, contrast, c
 Roads are a primary visual feature of Violet Night and must remain immediately legible on the dark map.
 
 - Use a layered road style (casing plus surface) with clear contrast between road classes.
-- Use OSM physical-width information when present, including `width`, `est_width`, and lane-width tags supported by the selected data source.
-- Use lane counts and lane-specific tags to improve road geometry and lane presentation.
-- Preserve provenance: mapped/measured width, estimated width, and style-only fallback width are different states. Never label a cartographic fallback as an actual OSM width.
-- When physical width is missing, use a documented road-class and zoom-dependent visual fallback.
-- Lane separators and markings must be clearly visible. If OSM does not contain exact marking geometry, render schematic lane separators from available lane counts and road structure; treat them as a visualization, not source data.
-- Ensure ramps, service roads, divided carriageways, and complex intersections remain distinct.
-- Adjust line widths and detail by zoom without causing roads to disappear or merge into one another.
+- Prefer actual OSM physical-width attributes when present: `width=*`, supported lane-width tags such as `width:lanes=*`, and directional width tags.
+- Keep `width=*` (mapped physical width), `est_width=*` (explicit estimate), and renderer fallback width as separate provenance states. Never label an estimate or style fallback as an actual OSM measurement.
+- Convert physical metres to screen-space width using the current zoom, latitude, map projection, and camera pitch. Road thickness must not be an arbitrary decorative value when a physical width is available.
+- Use `lanes=*`, `lanes:forward=*`, and `lanes:backward=*` as lane-count information, not as measured road width.
+- Lane markings must be high-contrast and clearly visible against the dark-violet road surface. Use `lane_markings=*`, `turn:lanes=*`, `change=*`, `overtaking=*`, `road_marking=*`, and `crossing:markings=*` where supplied.
+- Respect `lane_markings=no`: do not draw ordinary painted separators where OSM explicitly records that markings are absent.
+- If only lane counts are available, any generated lane guides must be visibly schematic and must not be presented as individually mapped paint.
+- Preserve ramps, service roads, divided carriageways, and complex intersections as separate geometry.
+- Adjust rendering detail by zoom without making roads disappear or merge into one another.
 
 ## 4B. Incremental loading and responsiveness
 
-The map must never enter an unbounded preparation phase for roads, cameras, or other OSM features.
+Road vector-tile loading and speed-camera preparation are independent pipelines. Camera preparation must never delay the first map frame, road rendering, GPS marker updates, or map gestures.
 
-- Load data incrementally through visible vector tiles and a bounded viewport/route context.
+- Load road data incrementally through visible vector tiles and a bounded viewport/route context.
 - Do not request or preprocess all cameras or all roads at application startup.
-- Cancel obsolete tile/feature requests after camera movement and debounce rapid viewport updates.
-- Render available data progressively rather than blocking the map until all nearby features are prepared.
-- Perform parsing, filtering, and spatial indexing away from the Android main thread.
-- Use tile caching, geometry simplification, zoom-dependent layers, and camera clustering at low zoom levels.
-- Avoid duplicate processing of the same feature across adjacent tiles; deduplicate by stable source identity where possible.
-- Apply bounded queues, request concurrency, and memory-aware cache limits.
-- Keep map gestures and camera animation responsive while network requests or feature processing continue.
-- Measure frame pacing, startup time, memory, CPU, and network use on representative devices.
-
+- Fetch camera objects only for visible bounds plus a limited buffer, or for a bounded corridor ahead of the active route.
+- Debounce viewport and route changes, cancel obsolete requests, and ignore late responses for stale viewports.
+- Render available road data progressively; camera results may appear later without holding the map.
+- Perform network access, parsing, filtering, normalisation, and spatial indexing away from the Android main thread.
+- Cache camera objects incrementally and use a spatial index (for example SQLite R*Tree) for nearby-camera lookup instead of scanning the full camera cache on each update.
+- Deduplicate features across adjacent tiles using stable source identity where available.
+- Use bounded queues, bounded request concurrency, caching, geometry simplification, zoom-dependent layers, and camera clustering at low zoom levels.
+- Measure first-frame time, frame pacing during pan/zoom, startup time, memory, CPU, and network use on representative devices.
 ## 5. Navigation screen
 
 The navigation layout is a dedicated arrangement over the same map.
@@ -185,12 +186,13 @@ A camera may be mounted beside a road, above it, or represented by a node associ
 
 ### Direction and field of view
 
-Read orientation from the source when available. Useful OSM tags include direction on highway=speed_camera and camera:direction for surveillance objects. Direction values may be cardinal directions or bearings in degrees clockwise from north, depending on the tagging scheme.
+For `highway=speed_camera`, read `direction=*` when present. For `man_made=surveillance` objects, read `camera:direction=*` where present. Direction values can be bearings or cardinal directions depending on the tagging scheme. Normalise supported values to a bearing while retaining the raw source value.
 
-Where an enforcement relation exists, inspect its device, from, and optional to members. The relation may describe which road segment and direction are enforced.
+In the surveillance tagging scheme, `camera:angle=*` describes vertical tilt relative to the horizon. It is **not** the horizontal field-of-view width. A direction bearing alone does not define a camera's viewing cone.
 
-The renderer may show a camera icon with an arrow or a restrained field-of-view wedge. It must not invent an angle when no directional data exists.
+Show a directional arrow when a valid bearing is available. Draw a horizontal viewing sector only when a separate, explicitly defined horizontal field-of-view value is available and its semantics are known. If direction is missing or malformed, show an undirected marker.
 
+Where an enforcement relation exists, inspect its device, from, and optional to members. The relation may describe which road segment and direction are enforced. Do not infer the affected direction from distance to a road alone.
 ### Alerts
 
 - Evaluate whether the user's route direction matches the camera's enforced direction.
