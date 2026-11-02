@@ -4,7 +4,7 @@
   const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
   const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
   const CAMERA_MIN_ZOOM = 13.5;
-  const ROAD_DATA_MIN_ZOOM = 15.5;
+  const ROAD_DATA_MIN_ZOOM = 16.5;
   const CAMERA_MAX_BBOX_AREA = 0.035;
   const OVERPASS_TIMEOUT_MS = 12000;
   const OSM_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -98,11 +98,16 @@
   let interruptedResponseRetries = 0;
   let networkRetryTimer = null;
   let activeStyleDefinition = STYLE_URL;
-  let osmRequestController = null;
-  let osmRequestTimer = null;
-  let osmRequestSerial = 0;
-  let osmRequestTimeout = null;
-  let osmCache = new Map();
+  let cameraRequestController = null;
+  let cameraRequestTimer = null;
+  let cameraRequestSerial = 0;
+  let cameraRequestTimeout = null;
+  let cameraCache = new Map();
+  let roadRequestController = null;
+  let roadRequestTimer = null;
+  let roadRequestSerial = 0;
+  let roadRequestTimeout = null;
+  let roadCache = new Map();
   let lastRoadScaleLatitude = null;
   let overlayClickHandlersBound = false;
 
@@ -1188,11 +1193,24 @@
     for (const [key, raw] of candidates) {
       if (!raw) continue;
       const value = String(raw).trim().toLowerCase().replace(",", ".");
-      const match = value.match(/(\d+(?:\.\d+)?)/);
-      if (!match) continue;
-      let widthMeters = Number(match[1]);
+      const feetInches = value.match(/^(\\d+(?:\\.\\d+)?)\\s*'\\s*(\\d+(?:\\.\\d+)?)?\\s*(?:"|″)?$/);
+      let widthMeters;
+      if (feetInches) {
+        widthMeters = Number(feetInches[1]) * 0.3048
+          + (Number(feetInches[2] || 0) * 0.0254);
+      } else {
+        const match = value.match(/(\\d+(?:\\.\\d+)?)\\s*(km|mi|miles|ft|feet|foot|in|inch|inches|cm|mm|m|meters|metres)?/);
+        if (!match) continue;
+        widthMeters = Number(match[1]);
+        const unit = match[2] || "m";
+        if (unit === "km") widthMeters *= 1000;
+        else if (unit === "mi" || unit === "miles") widthMeters *= 1609.344;
+        else if (unit === "ft" || unit === "feet" || unit === "foot") widthMeters *= 0.3048;
+        else if (unit === "in" || unit === "inch" || unit === "inches") widthMeters *= 0.0254;
+        else if (unit === "cm") widthMeters *= 0.01;
+        else if (unit === "mm") widthMeters *= 0.001;
+      }
       if (!Number.isFinite(widthMeters) || widthMeters <= 0 || widthMeters > 100) continue;
-      if (/\b(ft|foot|feet)\b|['′]/.test(value)) widthMeters *= 0.3048;
       return { widthMeters, widthTag: key };
     }
     return null;
