@@ -4,7 +4,7 @@
 
 Wemaps is being developed as a map-first Android application. It opens directly into a detailed perspective map, with 3D buildings, readable road geometry, clear map styling, and a foundation for future navigation features.
 
-> **Status:** the initial Android application foundation is being assembled. The first build is a map prototype; search, routing, GPS following, camera alerts, weather, and detailed lane guidance are planned work, not completed features.
+> **Status:** a minimal Android map application foundation is present. The first build provides the map shell and 3D building layer; search, routing, GPS following, camera alerts, weather, and detailed lane guidance remain planned work.
 
 ## Product direction
 
@@ -25,7 +25,7 @@ Wemaps is being developed as a map-first Android application. It opens directly 
 | Platform | Android |
 | Language | Kotlin |
 | UI | Jetpack Compose + Material 3 |
-| Map renderer | MapLibre Native Android |
+| Map renderer | MapLibre Native Android (Vulkan with OpenGL ES fallback) |
 | Map data | OpenStreetMap-derived vector tiles |
 | Initial public map source | OpenFreeMap |
 | Building rendering | MapLibre fill-extrusion layer |
