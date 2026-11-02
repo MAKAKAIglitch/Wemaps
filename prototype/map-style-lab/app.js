@@ -980,6 +980,21 @@
     if (overlayClickHandlersBound) return;
     overlayClickHandlersBound = true;
 
+    map.on("click", "wemaps-osm-measured-road-fill", (event) => {
+      const feature = event.features && event.features[0];
+      if (!feature) return;
+      const props = feature.properties || {};
+      new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+        .setLngLat(event.lngLat)
+        .setDOMContent(makeOverlayPopup("Ширина дороги из OSM", [
+          { label: "Ширина", value: Number(props.widthMeters).toFixed(1) + " м" },
+          { label: "Тег", value: props.widthTag },
+          { label: "Полосы", value: props.lanes || "не указано" },
+          { label: "OSM", value: props.osmId }
+        ]))
+        .addTo(map);
+    });
+
     map.on("click", "wemaps-camera-symbols", (event) => {
       const feature = event.features && event.features[0];
       if (!feature) return;
@@ -1149,9 +1164,9 @@
 
   function parseOsmWidthMeters(tags) {
     const candidates = [
-      ["width:effective", tags["width:effective"]],
       ["width:carriageway", tags["width:carriageway"]],
-      ["width", tags.width]
+      ["width", tags.width],
+      ["width:effective", tags["width:effective"]]
     ];
     for (const [key, raw] of candidates) {
       if (!raw) continue;
@@ -1190,9 +1205,8 @@
     return coordinates.map((point, index) => {
       const previous = coordinates[Math.max(0, index - 1)];
       const next = coordinates[Math.min(coordinates.length - 1, index + 1)];
-      const before = osmBearing(previous, point) * Math.PI / 180;
-      const after = osmBearing(point, next) * Math.PI / 180;
-      const tangent = Math.atan2(Math.sin(before) + Math.sin(after), Math.cos(before) + Math.cos(after));
+      const tangentBearing = osmBearing(previous, next);
+      const tangent = tangentBearing * Math.PI / 180;
       const bearing = (tangent * 180 / Math.PI + (offsetMeters >= 0 ? 90 : -90) + 360) % 360;
       return destinationPoint(point[0], point[1], bearing, Math.abs(offsetMeters));
     });
@@ -1331,7 +1345,7 @@
   function osmCacheKey(bounds) {
     return [
       bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()
-    ].map((value) => value.toFixed(3)).join("|");
+    ].map((value) => value.toFixed(4)).join("|");
   }
 
   async function fetchOsmOverlays() {
@@ -1345,6 +1359,7 @@
     const bounds = map.getBounds();
     const area = Math.abs((bounds.getEast() - bounds.getWest()) * (bounds.getNorth() - bounds.getSouth()));
     if (area > CAMERA_MAX_BBOX_AREA) {
+      map.getSource("wemaps-osm-live").setData({ type: "FeatureCollection", features: [] });
       osmOverlayStatus("OSM-слои · приблизь карту для точных данных");
       return;
     }
