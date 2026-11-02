@@ -41,7 +41,7 @@
             <label class="color-row"><span class="swatch" data-swatch="water"></span><span class="color-name">Вода</span><input data-color="water" type="color" value="#142135"><code>#142135</code></label>
             <label class="color-row"><span class="swatch" data-swatch="beach"></span><span class="color-name">Пляж и песок</span><input data-color="beach" type="color" value="#70562c"><code>#70562C</code></label>
           </div>
-          <div class="control-hint">Миниатюрные кроны появляются только при сильном приближении. Вид деревьев зависит от доступных тегов растительности.
+          <div class="control-hint">Мелкие символы деревьев появляются только вблизи. Если источник не передаёт породу, используется общий рисунок леса.
           </div>
         </section>
 
@@ -56,7 +56,7 @@
             <label class="color-row"><span class="swatch" data-swatch="motorway"></span><span class="color-name">Автомагистрали</span><input data-color="motorway" type="color" value="#dec9ff"><code>#DEC9FF</code></label>
             <label class="color-row"><span class="swatch" data-swatch="casing"></span><span class="color-name">Обводка дорог</span><input data-color="casing" type="color" value="#30243f"><code>#30243F</code></label>
           </div>
-          <div class="range-control"><div class="range-label"><label for="roadWidth">Общая толщина дорог</label><output id="roadWidthValue">112%</output></div><input id="roadWidth" type="range" min="85" max="145" value="112"><div class="control-hint">Ширина зависит от класса дороги и масштаба карты.</div></div>
+          <div class="range-control"><div class="range-label"><label for="roadWidth">Общая толщина дорог</label><output id="roadWidthValue">112%</output></div><input id="roadWidth" type="range" min="85" max="145" value="112"><div class="control-hint">Ширина зависит от класса дороги и масштаба. Пунктир — визуальная разметка, не точное число полос.</div></div>
         </section>
 
         <section class="control-section">
@@ -66,7 +66,7 @@
             <label class="color-row"><span class="swatch" data-swatch="buildingSide"></span><span class="color-name">Контур оснований</span><input data-color="buildingOutline" type="color" value="#342842"><code>#342842</code></label>
           </div>
           <div class="range-control"><div class="range-label"><label for="buildingOpacity">Непрозрачность</label><output id="buildingOpacityValue">96%</output></div><input id="buildingOpacity" type="range" min="35" max="100" value="96"></div>
-          <div class="control-hint">Используется высота из данных здания (render_height / height). Искусственное увеличение высоты отключено.</div>
+          <div class="control-hint">Используется высота из данных карты без искусственного увеличения. Если источник вычислил её по этажам, это оценка, а не замер.</div>
         </section>
 
         <section class="control-section">
