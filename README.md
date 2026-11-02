@@ -4,7 +4,7 @@
 
 Wemaps is being developed as a map-first Android application. It opens directly into a detailed perspective map, with 3D buildings, readable road geometry, clear map styling, and a foundation for future navigation features.
 
-> **Status:** a minimal Android map application foundation is present. The first build provides the map shell and 3D building layer; search, routing, GPS following, camera alerts, weather, and detailed lane guidance remain planned work.
+> **Status:** the Android map shell includes foreground device positioning, a geographic live location pointer, higher-contrast 3D buildings, and a first viewport-limited OSM lane-marking overlay. Search, routing, route-follow mode, lane-turn arrows, speed display, camera alerts, and weather remain future work.
 
 ## Product direction
 
@@ -101,7 +101,9 @@ The Windows build is split into the same helper-based pipeline used by Clear GPS
 
 Android Studio can also open the repository as a Gradle project.
 
-The current demo camera starts in a neutral sample area until device-location support is implemented. No location permission is requested by the initial map shell.
+On first launch, the app requests foreground approximate or precise location permission. While the app is visible, Android location fixes move a blue geographic pointer on the map; the location control recentres the map. Location updates stop when the app leaves the foreground, and no background-location permission is requested. A current fix is needed to centre the map on the device; otherwise the map opens in a neutral world overview.
+
+At close zoom levels, a separate, bounded Overpass request retrieves OSM lane tags for the visible map area. `lane_markings=no` suppresses generated separators. Ways tagged `lane_markings=yes` receive a brighter marking layer, but the line offsets are still derived from the road centreline and lane count; they are not exact surveyed paint polygons. Where the lane-marking tag is absent, any generated guides are deliberately muted and schematic. Turn-lane arrows and route-aware lane matching are not implemented yet.
 
 ## Documentation
 
