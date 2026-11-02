@@ -26,18 +26,18 @@ Violet Night is the visual design system for the map and navigation experience.
 
 | Map element | Initial color |
 | --- | --- |
-| Deep map background | \`#100D18\` |
-| Built-up areas | \`#191424\` |
-| Minor roads | \`#655B7A\` |
-| Local streets | \`#80709F\` |
-| Secondary roads | \`#A18BC9\` |
-| Primary roads | \`#B99CEB\` |
-| Major roads | \`#D1B7FF\` |
-| Building sides | \`#29213B\` |
-| Building roofs | \`#3A2E50\` |
-| Route outline | \`#7139BA\` |
-| Route line | \`#D18AFF\` |
-| Route highlight | \`#F4DEFF\` |
+| Deep map background | `#100D18` |
+| Built-up areas | `#191424` |
+| Minor roads | `#655B7A` |
+| Local streets | `#80709F` |
+| Secondary roads | `#A18BC9` |
+| Primary roads | `#B99CEB` |
+| Major roads | `#D1B7FF` |
+| Building sides | `#29213B` |
+| Building roofs | `#3A2E50` |
+| Route outline | `#7139BA` |
+| Route line | `#D18AFF` |
+| Route highlight | `#F4DEFF` |
 
 The palette is a starting specification. It may be refined after real-device readability, contrast, and performance testing. Road hierarchy must remain understandable without relying on color alone.
 
@@ -73,10 +73,13 @@ Roads must be visually distinct in the Violet Night palette while preserving a r
 - Prefer mapped physical width attributes such as `width`, `est_width`, and lane-width information when present and meaningful.
 - Use mapped lane counts and lane-specific tags where available. Do not present a guessed width as an exact OSM measurement.
 - When OSM has no physical width, use a documented cartographic fallback based on road class and zoom. Keep this fallback distinct from measured width in the internal data model.
-- Render lane separators and road markings with strong contrast. Where exact marking geometry is absent, generate restrained schematic markings from available lane structure; do not claim they were individually mapped.
-- Scale line widths with map zoom and preserve road hierarchy at intersections, ramps, and divided carriageways.
+- Render mapped lane markings with strong contrast. Use `lane_markings`, `lanes`, `turn:lanes`, `change`, `overtaking`, and separate `road_marking` geometries where the selected data source exposes them.
+- Respect `lane_markings=no`: do not draw painted lane separators where OSM explicitly records that markings are absent.
+- If only lane counts are known, generated lane guides must be clearly schematic and must not be presented as individually mapped paint.
+- Convert mapped metric widths to screen widths using zoom, latitude, projection, and camera pitch. Preserve the distinction between mapped `width`, estimated `est_width`, and renderer-only fallback width.
+- Preserve divided carriageways, ramps, and intersections rather than merging them into one decorative stroke.
 
-Loading must remain incremental and bounded. The app must not prepare or parse an unbounded set of roads or camera objects during startup. Request only visible map tiles and a limited route/viewport context, cancel obsolete requests after map movement, debounce rapid camera changes, and progressively display data as it arrives. Heavy parsing and indexing must run off the main thread. Use zoom-dependent detail, geometry simplification, caching, and clustering where appropriate. Profile frame time, memory, and network activity on real devices.
+Loading must remain incremental and bounded. Road vector-tile loading and speed-camera preparation are independent pipelines: camera preparation must never delay the first map frame, road rendering, or map gestures. Do not prepare every camera or road in a country at startup. Request camera data only for the visible viewport plus a bounded buffer, or a limited corridor ahead of the active route. Debounce viewport changes, cancel obsolete requests, deduplicate results across tile boundaries, and progressively display available data. Parse, filter, and index data off the Android main thread. Cache camera objects incrementally and use a spatial index (for example SQLite R*Tree) instead of scanning the entire cache for every map update. Use zoom-dependent detail, geometry simplification, bounded queues, caching, and clustering where appropriate. Profile first-frame time, frame pacing, memory, and network activity on real devices.
 
 ### Speed cameras
 
@@ -93,7 +96,7 @@ Wemaps should:
 - Distinguish speed cameras from ordinary surveillance cameras, speed-display signs, and dummy cameras.
 - Respect applicable local laws and data-provider terms.
 
-Relevant OpenStreetMap tagging includes \`highway=speed_camera\`, \`maxspeed\`, \`direction\`, \`man_made=surveillance\`, \`surveillance:type\`, \`camera:direction\`, and \`type=enforcement\` relations. See [camera tagging](https://wiki.openstreetmap.org/wiki/Tag:highway%3Dspeed_camera), [surveillance tagging](https://wiki.openstreetmap.org/wiki/Surveillance), and [enforcement relations](https://wiki.openstreetmap.org/wiki/Relation:enforcement).
+Relevant OpenStreetMap tagging includes `highway=speed_camera` with `direction=*`, `maxspeed=*`, and `type=enforcement` relations. For surveillance objects, use `man_made=surveillance`, `surveillance:type=*`, and `camera:direction=*` where present. In this scheme, `camera:angle=*` describes vertical tilt relative to the horizon; it is not the horizontal field-of-view width. Do not invent a viewing cone from a bearing alone. See [speed-camera tagging](https://wiki.openstreetmap.org/wiki/Tag:highway%3Dspeed_camera), [camera direction](https://wiki.openstreetmap.org/wiki/Key:camera%3Adirection), [camera angle](https://wiki.openstreetmap.org/wiki/Key:camera%3Aangle), [surveillance tagging](https://wiki.openstreetmap.org/wiki/Surveillance), and [enforcement relations](https://wiki.openstreetmap.org/wiki/Relation:enforcement).
 
 ### Weather
 
@@ -158,6 +161,7 @@ See:
 - [Technical architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Data attribution](docs/ATTRIBUTION.md)
+- [Road rendering and camera performance](docs/ROAD_RENDERING.md)
 - [Contributing guide](CONTRIBUTING.md)
 
 ## Licensing and data attribution
