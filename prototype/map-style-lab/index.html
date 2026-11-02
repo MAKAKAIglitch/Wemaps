@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Wemaps · Violet Night Style Lab</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <main class="workspace">
+    <aside class="sidebar">
+      <header class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40"><path d="M20 3 24.8 15.2 37 20l-12.2 4.8L20 37l-4.8-12.2L3 20l12.2-4.8L20 3Z" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="20" cy="20" r="4.1" fill="currentColor"/></svg>
+        </div>
+        <div class="brand-copy">
+          <div class="brand-name">Wemaps <span>LAB</span></div>
+          <div class="brand-subtitle">Violet Night · Map style prototype</div>
+        </div>
+        <div class="live-indicator"><i></i> LOCAL</div>
+      </header>
+
+      <section class="intro">
+        <div class="eyebrow">PROTOTYPE 01</div>
+        <h1>Картографический<br><em>стиль</em></h1>
+        <p>Настраивай цвета, 3D-здания и перспективу. Изменения сразу видны на карте.</p>
+      </section>
+
+      <div class="panel-scroll">
+        <section class="control-section">
+          <div class="section-heading"><div><span class="section-index">01</span><h2>Поверхность</h2></div><span class="section-note">LAND & WATER</span></div>
+          <div class="color-list">
+            <label class="color-row"><span class="swatch" data-swatch="background"></span><span class="color-name">Фон карты</span><input data-color="background" type="color" value="#100d18"><code>#100D18</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="residential"></span><span class="color-name">Застройка</span><input data-color="residential" type="color" value="#191424"><code>#191424</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="park"></span><span class="color-name">Парки и зелень</span><input data-color="park" type="color" value="#19291f"><code>#19291F</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="water"></span><span class="color-name">Вода</span><input data-color="water" type="color" value="#142135"><code>#142135</code></label>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <div class="section-heading"><div><span class="section-index">02</span><h2>Дороги</h2></div><span class="section-note">ROAD HIERARCHY</span></div>
+          <div class="color-list">
+            <label class="color-row"><span class="swatch" data-swatch="minor"></span><span class="color-name">Мелкие дороги</span><input data-color="minor" type="color" value="#655b7a"><code>#655B7A</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="local"></span><span class="color-name">Городские улицы</span><input data-color="local" type="color" value="#80709f"><code>#80709F</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="secondary"></span><span class="color-name">Второстепенные</span><input data-color="secondary" type="color" value="#a18bc9"><code>#A18BC9</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="primary"></span><span class="color-name">Главные дороги</span><input data-color="primary" type="color" value="#b99ceb"><code>#B99CEB</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="trunk"></span><span class="color-name">Скоростные дороги</span><input data-color="trunk" type="color" value="#c8a9eb"><code>#C8A9EB</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="motorway"></span><span class="color-name">Автомагистрали</span><input data-color="motorway" type="color" value="#d1b7ff"><code>#D1B7FF</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="casing"></span><span class="color-name">Обводка дорог</span><input data-color="casing" type="color" value="#30243f"><code>#30243F</code></label>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <div class="section-heading"><div><span class="section-index">03</span><h2>Здания 3D</h2></div><span class="section-note">FILL EXTRUSION</span></div>
+          <div class="color-list">
+            <label class="color-row"><span class="swatch" data-swatch="buildingRoof"></span><span class="color-name">Крыши</span><input data-color="buildingRoof" type="color" value="#3a2e50"><code>#3A2E50</code></label>
+            <label class="color-row"><span class="swatch" data-swatch="buildingSide"></span><span class="color-name">Боковые грани</span><input data-color="buildingSide" type="color" value="#29213b"><code>#29213B</code></label>
+          </div>
+          <div class="range-control"><div class="range-label"><label for="buildingOpacity">Непрозрачность</label><output id="buildingOpacityValue">92%</output></div><input id="buildingOpacity" type="range" min="35" max="100" value="92"></div>
+          <div class="range-control"><div class="range-label"><label for="buildingHeight">Масштаб высоты</label><output id="buildingHeightValue">1.0×</output></div><input id="buildingHeight" type="range" min="60" max="180" value="100"></div>
+        </section>
+
+        <section class="control-section">
+          <div class="section-heading"><div><span class="section-index">04</span><h2>Камера</h2></div><span class="section-note">3D VIEW</span></div>
+          <div class="range-control"><div class="range-label"><label for="pitch">Наклон карты</label><output id="pitchValue">58°</output></div><input id="pitch" type="range" min="35" max="75" value="58"></div>
+          <div class="range-control"><div class="range-label"><label for="zoom">Масштаб</label><output id="zoomValue">15.2</output></div><input id="zoom" type="range" min="5" max="19" step="0.1" value="15.2"></div>
+          <div class="button-row"><button class="button button-secondary" id="resetCamera" type="button">Сбросить камеру</button><button class="button button-secondary" id="toggleBuildings" type="button">3D: включено</button></div>
+        </section>
+
+        <section class="control-section presets-section">
+          <div class="section-heading"><div><span class="section-index">05</span><h2>Пресеты</h2></div><span class="section-note">COLOR MOODS</span></div>
+          <div class="preset-grid">
+            <button class="preset active" data-preset="violet" type="button"><i class="preset-dot violet"></i><span><b>Violet Night</b><small>Основная тема</small></span></button>
+            <button class="preset" data-preset="deep" type="button"><i class="preset-dot deep"></i><span><b>Deep Purple</b><small>Темнее и спокойнее</small></span></button>
+            <button class="preset" data-preset="neon" type="button"><i class="preset-dot neon"></i><span><b>Neon Violet</b><small>Более яркие дороги</small></span></button>
+          </div>
+        </section>
+      </div>
+
+      <footer class="sidebar-footer">
+        <button class="button button-primary" id="exportStyle" type="button"><span>↓</span> Экспортировать style.json</button>
+        <div class="footer-actions"><button class="text-button" id="resetStyle" type="button">Вернуть исходные цвета</button><button class="text-button" id="importStyle" type="button">Импорт JSON</button><input id="styleFile" type="file" accept=".json,application/json" hidden></div>
+        <div class="footer-note">Настройки сохраняются в этом браузере. Карта и тайлы загружаются из OpenFreeMap.</div>
+      </footer>
+    </aside>
+
+    <section class="map-stage">
+      <div id="map" aria-label="Интерактивная карта-прототип Wemaps"></div>
+      <div class="map-topbar">
+        <div class="map-badge"><i class="pulse"></i><span id="mapStatus">Подключение к карте…</span></div>
+        <div class="map-top-actions"><button class="map-action" id="view2d" type="button" title="Вид сверху">2D</button><button class="map-action selected" id="view3d" type="button" title="Перспективный вид">3D</button><button class="map-action" id="recenter" type="button" title="Вернуться к тестовой области">◎</button></div>
+      </div>
+      <div class="map-bottom-left"><div class="map-title">Wemaps <span>·</span> Violet Night</div><div class="map-subtitle">STYLE PREVIEW · VECTOR MAP</div></div>
+      <div class="map-hint">Перетаскивай карту · Колесо мыши — масштаб · Ctrl + перетаскивание — наклон</div>
+      <div class="map-error" id="mapError" hidden></div>
+    </section>
+  </main>
+  <script src="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
