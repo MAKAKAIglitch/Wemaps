@@ -963,7 +963,7 @@
       map.setPaintProperty(layer.id, "fill-extrusion-color", [
         "coalesce", ["get", "colour"], palette.buildingRoof
       ]);
-      map.setPaintProperty(layer.id, "fill-extrusion-opacity", buildingOpacity);
+      map.setPaintProperty(layer.id, "fill-extrusion-opacity", currentExtrusionOpacity);
       map.setPaintProperty(layer.id, "fill-extrusion-vertical-gradient", true);
     });
 
@@ -1036,7 +1036,7 @@
       "wemaps:style": "Violet Night",
       "wemaps:prototype": "Local Map Style Lab",
       "wemaps:buildings": "Uses source render_height / height attributes without arbitrary height scaling",
-      "wemaps:road-style": "Road class widths, visual depth casing, top sheen, and zoom-gated lane markings",
+      "wemaps:road-style": "Road class widths, visual depth casing, top sheen, and schematic zoom-gated lane dividers; inferred counts are not surveyed geometry",
       "wemaps:vegetation": "Woodland patterns are decorative; species detail depends on provider attributes",
       "wemaps:required-images": "wemaps-forest-generic, wemaps-forest-pine, wemaps-forest-broadleaf, wemaps-orchard, wemaps-vineyard are registered by the prototype at runtime",
       "wemaps:export-note": "Review provider terms and attribution before production use."
