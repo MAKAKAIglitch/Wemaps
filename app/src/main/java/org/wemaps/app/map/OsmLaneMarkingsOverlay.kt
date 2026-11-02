@@ -99,7 +99,11 @@ class OsmLaneMarkingsOverlay(
     }
 
     private fun requestVisibleRoads() {
-        if (closed || map.cameraPosition.zoom < MIN_ZOOM) return
+        if (closed) return
+        if (map.cameraPosition.zoom < MIN_ZOOM) {
+            clearLayers()
+            return
+        }
 
         val raw = DoubleArray(4)
         runCatching { map.projection.getVisibleCoordinateBounds(raw) }
@@ -113,20 +117,24 @@ class OsmLaneMarkingsOverlay(
             west = raw[3].coerceIn(-180.0, 180.0)
         )
 
-        if (bounds.north <= bounds.south || bounds.east <= bounds.west) return
+        if (bounds.north <= bounds.south || bounds.east <= bounds.west) {
+            clearLayers()
+            return
+        }
         if (bounds.north - bounds.south > MAX_LAT_SPAN ||
             bounds.east - bounds.west > MAX_LON_SPAN
-        ) return
+        ) {
+            clearLayers()
+            return
+        }
 
         val now = System.currentTimeMillis()
         val previous = lastBounds
         if (previous != null &&
-            now - lastRequestAt < MIN_REQUEST_INTERVAL_MS &&
-            sameArea(previous, bounds)
+            sameArea(previous, bounds) &&
+            now - lastRequestAt < SAME_VIEWPORT_CACHE_MS
         ) return
-        if (previous != null &&
-            now - lastRequestAt < MIN_REQUEST_INTERVAL_MS
-        ) return
+        if (now - lastRequestAt < MIN_REQUEST_INTERVAL_MS) return
 
         lastBounds = bounds
         lastRequestAt = now
@@ -154,8 +162,11 @@ class OsmLaneMarkingsOverlay(
             (
               way["highway"]["lanes"]($bbox);
               way["highway"]["lanes:forward"]($bbox);
+              way["highway"]["lanes:backward"]($bbox);
               way["highway"]["lane_markings"]($bbox);
               way["highway"]["turn:lanes"]($bbox);
+              way["highway"]["turn:lanes:forward"]($bbox);
+              way["highway"]["turn:lanes:backward"]($bbox);
             );
             out geom;
         """.trimIndent()
@@ -335,6 +346,11 @@ class OsmLaneMarkingsOverlay(
         }
     }
 
+    private fun clearLayers() {
+        (style.getSource(MAPPED_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(EMPTY_COLLECTION)
+        (style.getSource(SCHEMATIC_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(EMPTY_COLLECTION)
+    }
+
     private fun sameArea(a: Bounds, b: Bounds): Boolean =
         abs(a.north - b.north) < 0.003 &&
             abs(a.south - b.south) < 0.003 &&
@@ -361,6 +377,7 @@ class OsmLaneMarkingsOverlay(
         private const val USER_AGENT = "Wemaps/0.1.0-dev (Android map; OpenStreetMap data)"
         private const val MIN_ZOOM = 15.5
         private const val MIN_REQUEST_INTERVAL_MS = 12_000L
+        private const val SAME_VIEWPORT_CACHE_MS = 180_000L
         private const val CONNECT_TIMEOUT_MS = 12_000
         private const val READ_TIMEOUT_MS = 24_000
         private const val MAX_LAT_SPAN = 0.04
