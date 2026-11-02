@@ -21,6 +21,7 @@ This roadmap describes intended development order. It contains no delivery dates
 - [ ] Implement the first editable Waze-inspired dark map palette using centralized style tokens.
 - [ ] Keep Violet Night as a separate selectable style preset; do not hard-code colors into individual layers.
 - [ ] Define a style configuration format that supports named presets and custom color overrides.
+- [ ] Load the initial presets from `design/map-style-presets.json` and validate unknown/missing tokens safely.
 - [ ] Open directly into the map.
 - [ ] Implement the compact bottom dock.
 - [ ] Add basic zoom, rotation, recenter, and compass controls.
