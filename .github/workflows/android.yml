@@ -86,3 +86,62 @@ jobs:
           javac.exe -version
 
           .\gradlew.bat --version
+
+      - name: Smoke-test Windows APK builder with an existing project SDK path
+        shell: pwsh
+        run: |
+          $testRoot = Join-Path $env:RUNNER_TEMP "wemaps-builder-smoke"
+          $fakeSdk = Join-Path $testRoot "android-sdk"
+          $fakeProfile = Join-Path $testRoot "profile"
+          $fakeAppData = Join-Path $testRoot "roaming"
+          $fakeLocalAppData = Join-Path $testRoot "local"
+
+          $env:USERPROFILE = $fakeProfile
+          $env:APPDATA = $fakeAppData
+          $env:LOCALAPPDATA = $fakeLocalAppData
+          $env:ANDROID_HOME = ""
+          $env:ANDROID_SDK_ROOT = ""
+          $env:CI = "true"
+
+          $probeProject = Join-Path $fakeProfile "AndroidStudioProjects\SdkProbe"
+          New-Item -ItemType Directory -Force -Path (Join-Path $fakeSdk "platforms"), $probeProject, $fakeAppData, $fakeLocalAppData | Out-Null
+          $sdkForProperties = $fakeSdk.Replace('\', '/')
+          Set-Content -Path (Join-Path $probeProject "local.properties") -Value "sdk.dir=$sdkForProperties" -Encoding ascii
+
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -notmatch '(?i)\\platform-tools\\?$|\\cmdline-tools\\[^\\]+\\bin\\?
+
+          }) -join ';'
+
+          $wrapperPath = Join-Path $env:GITHUB_WORKSPACE "gradlew.bat"
+          $originalWrapper = [System.IO.File]::ReadAllText($wrapperPath)
+          $apkDirectory = Join-Path $env:GITHUB_WORKSPACE "app\build\outputs\apk\debug"
+          $fakeApk = Join-Path $apkDirectory "app-debug.apk"
+
+          try {
+            [System.IO.File]::WriteAllText($wrapperPath, "@echo off" + [Environment]::NewLine + "exit /b 0" + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
+            New-Item -ItemType Directory -Force -Path $apkDirectory | Out-Null
+            [System.IO.File]::WriteAllText($fakeApk, "Wemaps Windows builder smoke test", [System.Text.Encoding]::ASCII)
+
+            $output = & cmd.exe /d /c build-windows.bat 2>&1 | Out-String
+            $exitCode = $LASTEXITCODE
+            Write-Host $output
+
+            if ($exitCode -ne 0) {
+              throw "build-windows.bat exited with code $exitCode"
+            }
+            if ($output -notmatch [regex]::Escape($fakeSdk)) {
+              throw "SDK path from another project's local.properties was not detected"
+            }
+            if (-not (Test-Path "Wemaps-debug.apk")) {
+              throw "The builder did not copy the APK into the project root"
+            }
+            if ((Get-Content "Wemaps-debug.apk" -Raw) -ne "Wemaps Windows builder smoke test") {
+              throw "The copied APK content does not match the test APK"
+            }
+
+            Write-Host "Windows APK builder smoke test passed."
+          }
+          finally {
+            [System.IO.File]::WriteAllText($wrapperPath, $originalWrapper, [System.Text.Encoding]::ASCII)
+          }
