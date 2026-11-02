@@ -1193,13 +1193,13 @@
     for (const [key, raw] of candidates) {
       if (!raw) continue;
       const value = String(raw).trim().toLowerCase().replace(",", ".");
-      const feetInches = value.match(/^(\\d+(?:\\.\\d+)?)\\s*'\\s*(\\d+(?:\\.\\d+)?)?\\s*(?:"|″)?$/);
+      const feetInches = value.match(/^(\d+(?:\.\d+)?)\s*'\s*(\d+(?:\.\d+)?)?\s*(?:"|″)?$/);
       let widthMeters;
       if (feetInches) {
         widthMeters = Number(feetInches[1]) * 0.3048
           + (Number(feetInches[2] || 0) * 0.0254);
       } else {
-        const match = value.match(/(\\d+(?:\\.\\d+)?)\\s*(km|mi|miles|ft|feet|foot|in|inch|inches|cm|mm|m|meters|metres)?/);
+        const match = value.match(/(\d+(?:\.\d+)?)\s*(km|mi|miles|ft|feet|foot|in|inch|inches|cm|mm|m|meters|metres)?/);
         if (!match) continue;
         widthMeters = Number(match[1]);
         const unit = match[2] || "m";
