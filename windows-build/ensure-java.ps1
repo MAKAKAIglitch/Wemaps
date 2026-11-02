@@ -16,7 +16,7 @@ function Add-JavaCandidate {
     if ([string]::IsNullOrWhiteSpace($Path)) { return }
     $Expanded = [Environment]::ExpandEnvironmentVariables($Path.Trim().Trim('"'))
 
-    if (Test-Path -LiteralPath $Expanded -PathType Leaf) {
+    if (Test-Path -LiteralPath $Expanded -PathType Leaf -ErrorAction SilentlyContinue) {
         $Leaf = [IO.Path]::GetFileName($Expanded)
         if ($Leaf -ieq 'java.exe' -or $Leaf -ieq 'javac.exe') {
             $Expanded = Split-Path -Parent (Split-Path -Parent $Expanded)
@@ -50,11 +50,11 @@ function Add-JavaFolder {
     )
 
     if ([string]::IsNullOrWhiteSpace($Path)) { return }
-    if (Test-Path -LiteralPath ([IO.Path]::Combine($Path, 'bin', 'java.exe')) -PathType Leaf -ErrorAction SilentlyContinue) {
+    if (Test-Path -LiteralPath ([IO.Path]::Combine($Path, 'bin\java.exe')) -PathType Leaf -ErrorAction SilentlyContinue) {
         Add-JavaCandidate -Path $Path -Source $Source
         return
     }
-    if (Test-Path -LiteralPath $Path -PathType Container) {
+    if (Test-Path -LiteralPath $Path -PathType Container -ErrorAction SilentlyContinue) {
         Get-ChildItem -LiteralPath $Path -Directory -ErrorAction SilentlyContinue |
             Sort-Object FullName -Descending |
             ForEach-Object { Add-JavaCandidate -Path $_.FullName -Source $Source }
@@ -142,7 +142,7 @@ foreach ($ProgramRoot in $ProgramRoots) {
         'Zulu',
         'BellSoft\LibericaJDK'
     )) {
-        Add-JavaFolder -Path (Join-Path $ProgramRoot $RelativePath) -Source 'Program Files'
+        Add-JavaFolder -Path ([IO.Path]::Combine($ProgramRoot, $RelativePath)) -Source 'Program Files'
     }
 }
 
@@ -155,7 +155,7 @@ if ($env:LOCALAPPDATA) {
         'Programs\Zulu',
         'JetBrains\Toolbox\apps\AndroidStudio'
     )) {
-        $Root = Join-Path $env:LOCALAPPDATA $RelativePath
+        $Root = [IO.Path]::Combine($env:LOCALAPPDATA, $RelativePath)
         Add-JavaFolder -Path $Root -Source 'per-user JDK folder'
         if ((Test-Path -LiteralPath $Root -PathType Container) -and $RelativePath -like '*AndroidStudio') {
             Get-ChildItem -LiteralPath $Root -Directory -Recurse -ErrorAction SilentlyContinue |
@@ -166,8 +166,8 @@ if ($env:LOCALAPPDATA) {
 }
 
 if ($env:USERPROFILE) {
-    Add-JavaFolder -Path (Join-Path $env:USERPROFILE '.jdks') -Source 'JetBrains managed JDK'
-    Add-JavaFolder -Path (Join-Path $env:USERPROFILE '.gradle\jdks') -Source 'Gradle managed JDK'
+    Add-JavaFolder -Path ([IO.Path]::Combine($env:USERPROFILE, '.jdks')) -Source 'JetBrains managed JDK'
+    Add-JavaFolder -Path ([IO.Path]::Combine($env:USERPROFILE, '.gradle\jdks')) -Source 'Gradle managed JDK'
 }
 
 foreach ($RegistryRoot in @(
