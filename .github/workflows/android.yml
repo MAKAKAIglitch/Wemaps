@@ -90,13 +90,15 @@ jobs:
           $fakeSdk = Join-Path $testRoot "existing-sdk"
           $fakeLocalAppData = Join-Path $testRoot "local-appdata"
           $fakeManagedSdk = Join-Path $fakeLocalAppData "Wemaps\AndroidSdk"
+          $fakeState = Join-Path $testRoot "state"
           $managerDir = Join-Path $fakeSdk "cmdline-tools\test\bin"
-          New-Item -ItemType Directory -Force -Path $managerDir, $fakeLocalAppData | Out-Null
+          New-Item -ItemType Directory -Force -Path $managerDir, $fakeLocalAppData, $fakeState | Out-Null
 
           $env:ANDROID_SDK_ROOT = $fakeSdk
           $env:ANDROID_HOME = ""
           $env:LOCALAPPDATA = $fakeLocalAppData
           $env:WEMAPS_FAKE_MANAGED_SDK = $fakeManagedSdk
+          $env:WEMAPS_FAKE_STATE = $fakeState
           Remove-Item Env:CI -ErrorAction SilentlyContinue
 
           $fakeManager = @'
@@ -104,18 +106,17 @@ jobs:
           setlocal EnableExtensions
           echo(%*|findstr.exe /I /C:"--licenses" >nul
           if not errorlevel 1 exit /b 0
-          set "SDK_ARG=%~1"
-          set "SDK_ARG=%SDK_ARG:--sdk_root=%"
-          if /I "%SDK_ARG%"=="%WEMAPS_FAKE_MANAGED_SDK%" (
-            if not exist "%SDK_ARG%\platforms\android-37.1" mkdir "%SDK_ARG%\platforms\android-37.1"
-            if not exist "%SDK_ARG%\build-tools\36.0.0" mkdir "%SDK_ARG%\build-tools\36.0.0"
-            > "%SDK_ARG%\platforms\android-37.1\android.jar" echo fake platform
-            > "%SDK_ARG%\build-tools\36.0.0\aapt2.exe" echo fake aapt2
-            > "%SDK_ARG%\build-tools\36.0.0\zipalign.exe" echo fake zipalign
-            exit /b 0
+          if not exist "%WEMAPS_FAKE_STATE%\install-attempted" (
+            > "%WEMAPS_FAKE_STATE%\install-attempted" echo first-attempt
+            echo Warning: Failed to read or create install properties file.
+            exit /b 1
           )
-          echo Warning: Failed to read or create install properties file.
-          exit /b 1
+          if not exist "%WEMAPS_FAKE_MANAGED_SDK%\platforms\android-37.1" mkdir "%WEMAPS_FAKE_MANAGED_SDK%\platforms\android-37.1"
+          if not exist "%WEMAPS_FAKE_MANAGED_SDK%\build-tools\36.0.0" mkdir "%WEMAPS_FAKE_MANAGED_SDK%\build-tools\36.0.0"
+          > "%WEMAPS_FAKE_MANAGED_SDK%\platforms\android-37.1\android.jar" echo fake platform
+          > "%WEMAPS_FAKE_MANAGED_SDK%\build-tools\36.0.0\aapt2.exe" echo fake aapt2
+          > "%WEMAPS_FAKE_MANAGED_SDK%\build-tools\36.0.0\zipalign.exe" echo fake zipalign
+          exit /b 0
           '@
           [System.IO.File]::WriteAllText(
             (Join-Path $managerDir "sdkmanager.bat"),
