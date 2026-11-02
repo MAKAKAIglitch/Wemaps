@@ -130,6 +130,12 @@ Use available OSM attributes:
 - Never render standard painted separators when `lane_markings=no` is mapped.
 - Where only lane count is known, generated lane divisions are schematic. Keep that provenance separate from mapped road-marking geometry.
 
+### Current Android prototype
+
+The Android map currently requests foreground-only coarse/fine location permission. With permission, it reads Android's GPS provider (fine permission) and network provider, places a live map feature at the returned coordinates, and rotates its pointer only when Android reports a usable course while moving. It does not collect background location. The camera moves to the first valid fix; the location control recentres the map later.
+
+For road detail, the prototype requests OSM ways inside the visible viewport from the Overpass API once the map is zoomed in. Requests are bounded, rate-limited, performed off the main thread, and discarded if a newer viewport request supersedes them. Ways with `lanes`, directional lane counts, `width`, `est_width`, `width:lanes`, or lane-marking tags can contribute generated divider guides. `lane_markings=no` suppresses separators. The guide geometry is offset from the OSM road centreline, so it remains schematic even when `lane_markings=yes`; that tag confirms the presence of markings, not their exact mapped paint geometry. The base map remains available if Overpass is unavailable or rate-limits the request.
+
 ### Generated geometry limitations
 
 A basic OSM road is commonly represented by a centreline, not by a polygon for every lane. If the provider supplies no lane polygons or marking geometries, Wemaps may derive lane offsets from the centreline, road width, lane count, and direction. This requires curve-aware offsetting, joins, splits, and intersection handling. It is an approximation and must not be described as exact surveyed lane geometry.
