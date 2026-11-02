@@ -23,8 +23,8 @@ function Add-JavaCandidate {
         }
     }
 
-    if (-not (Test-Path -LiteralPath (Join-Path $Expanded 'bin\java.exe') -PathType Leaf) -or
-        -not (Test-Path -LiteralPath (Join-Path $Expanded 'bin\javac.exe') -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Expanded, 'bin', 'java.exe')) -PathType Leaf -ErrorAction SilentlyContinue) -or
+        -not (Test-Path -LiteralPath ([IO.Path]::Combine($Expanded, 'bin', 'javac.exe')) -PathType Leaf -ErrorAction SilentlyContinue)) {
         return
     }
 
@@ -50,7 +50,7 @@ function Add-JavaFolder {
     )
 
     if ([string]::IsNullOrWhiteSpace($Path)) { return }
-    if (Test-Path -LiteralPath (Join-Path $Path 'bin\java.exe') -PathType Leaf) {
+    if (Test-Path -LiteralPath ([IO.Path]::Combine($Path, 'bin', 'java.exe')) -PathType Leaf -ErrorAction SilentlyContinue) {
         Add-JavaCandidate -Path $Path -Source $Source
         return
     }
@@ -121,8 +121,8 @@ Get-ChildItem Env: -ErrorAction SilentlyContinue |
 foreach ($PathEntry in ($env:PATH -split [regex]::Escape([IO.Path]::PathSeparator))) {
     $Entry = $PathEntry.Trim().Trim('"')
     if ([string]::IsNullOrWhiteSpace($Entry)) { continue }
-    $JavaExe = Join-Path $Entry 'java.exe'
-    if (Test-Path -LiteralPath $JavaExe -PathType Leaf) {
+    $JavaExe = [IO.Path]::Combine($Entry, 'java.exe')
+    if (Test-Path -LiteralPath $JavaExe -PathType Leaf -ErrorAction SilentlyContinue) {
         Add-JavaCandidate -Path (Split-Path -Parent (Split-Path -Parent $JavaExe)) -Source 'PATH'
     }
 }
@@ -188,7 +188,7 @@ foreach ($RegistryRoot in @(
 }
 
 foreach ($Candidate in $script:Candidates) {
-    $JavaExe = Join-Path $Candidate.Home 'bin\java.exe'
+    $JavaExe = [IO.Path]::Combine($Candidate.Home, 'bin', 'java.exe')
     $Major = Get-JavaMajorVersion -JavaExe $JavaExe
     if ($null -ne $Major) {
         Write-Host "Using JDK $Major from $($Candidate.Source): $($Candidate.Home)"
