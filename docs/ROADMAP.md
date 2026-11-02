@@ -36,6 +36,20 @@ This roadmap describes intended development order. It contains no delivery dates
 
 **Milestone:** a polished Violet Night 3D map prototype.
 
+## Stage 2A — Road cartography and loading performance
+
+- [ ] Define road casing, surface, and lane-marking styles for Violet Night.
+- [ ] Use OSM physical-width and lane attributes where available.
+- [ ] Separate mapped width from estimated and renderer-fallback widths.
+- [ ] Add zoom-dependent road widths and geometry detail.
+- [ ] Ensure lane separators remain legible without pretending unmapped markings are source data.
+- [ ] Implement viewport-bounded, incremental vector-tile loading.
+- [ ] Cancel obsolete requests and deduplicate features across tile boundaries.
+- [ ] Move parsing and spatial indexing off the UI thread.
+- [ ] Add performance tests for startup, camera movement, dense road networks, and camera overlays.
+
+**Milestone:** visually strong roads with visible lane structure and responsive map loading.
+
 ## Stage 3 — Device location
 
 - [ ] Add runtime location permission flow.
