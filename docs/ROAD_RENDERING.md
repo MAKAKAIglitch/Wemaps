@@ -138,6 +138,21 @@ A basic OSM road is commonly represented by a centreline, not by a polygon for e
 
 The selected vector tile provider must retain the relevant OSM properties. A style cannot use source tags that the provider strips from its tiles. Verify property coverage before choosing the provider for detailed-road rendering.
 
+## 7. Vector-tile provider limitation: lane data
+
+A visually styled road line is not the same thing as detailed lane geometry. The selected tile provider must actually include the OSM lane properties needed by Wemaps.
+
+The published OpenMapTiles `transportation` schema lists fields such as `class`, `subclass`, `network`, `oneway`, `ramp`, `brunnel`, `service`, `access`, `toll`, `expressway`, `layer`, `level`, and `surface`. It does not list raw `width`, `lanes`, `turn:lanes`, or `lane_markings` fields in that layer. A service built on this schema cannot be assumed to provide the attributes required for detailed lane rendering. See the [OpenMapTiles schema](https://openmaptiles.org/docs/schema/).
+
+Before selecting a production tile source:
+1. Inspect its actual style JSON and decoded vector-tile properties.
+2. Verify physical width, directional lane counts, turn-lane values, lane-marking tags, and camera attributes independently.
+3. If these properties are missing, use a provider that exposes them or a separately licensed, bounded feature-data source for the visible viewport / route corridor.
+4. Keep supplementary road-detail retrieval asynchronous and independent from base road tiles.
+5. Review provider rate limits, caching rules, and redistribution terms before shipping.
+
+OpenFreeMap remains a candidate for the base map prototype. Its use does not by itself prove that all detailed OSM road attributes are present in its vector tiles. Do not claim that the app is rendering actual OSM lane widths or lane markings until the selected data source has been inspected.
+
 ## 7. Editable map palettes
 
 Map colors must be centralized in one configuration layer. Individual style layers must reference semantic tokens rather than hard-coded color literals.
