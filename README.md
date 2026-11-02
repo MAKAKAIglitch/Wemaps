@@ -66,6 +66,18 @@ The palette is a starting specification. It may be refined after real-device rea
 
 The app should use mapped road attributes and sign objects instead of guessing. It should distinguish a known, explicitly mapped limit from a value inferred from road defaults or incomplete data. Conditional and vehicle-specific restrictions must not be presented as universal limits.
 
+### Road rendering, lane markings, and performance
+
+Roads must be visually distinct in the Violet Night palette while preserving a readable hierarchy. Road casing, fill, and lane markings should remain clearly visible against the dark background, including at night and in dense junctions.
+
+- Prefer mapped physical width attributes such as `width`, `est_width`, and lane-width information when present and meaningful.
+- Use mapped lane counts and lane-specific tags where available. Do not present a guessed width as an exact OSM measurement.
+- When OSM has no physical width, use a documented cartographic fallback based on road class and zoom. Keep this fallback distinct from measured width in the internal data model.
+- Render lane separators and road markings with strong contrast. Where exact marking geometry is absent, generate restrained schematic markings from available lane structure; do not claim they were individually mapped.
+- Scale line widths with map zoom and preserve road hierarchy at intersections, ramps, and divided carriageways.
+
+Loading must remain incremental and bounded. The app must not prepare or parse an unbounded set of roads or camera objects during startup. Request only visible map tiles and a limited route/viewport context, cancel obsolete requests after map movement, debounce rapid camera changes, and progressively display data as it arrives. Heavy parsing and indexing must run off the main thread. Use zoom-dependent detail, geometry simplification, caching, and clustering where appropriate. Profile frame time, memory, and network activity on real devices.
+
 ### Speed cameras
 
 Camera support is a core navigation feature, not just a generic point-of-interest layer.
