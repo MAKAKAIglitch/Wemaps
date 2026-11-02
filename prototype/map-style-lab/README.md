@@ -6,7 +6,7 @@ A local browser-based playground for tuning the Wemaps map appearance before imp
 
 - Loads the OpenFreeMap Liberty vector style into MapLibre GL JS.
 - Applies the Violet Night palette to the actual map layers.
-- Lets you adjust land, water, road hierarchy, building colors, 3D opacity, building height scale, camera pitch, and zoom.
+- Lets you adjust land, water, beach, woodland, road hierarchy, road thickness, building colors, 3D opacity, camera pitch, and zoom.
 - Updates the map as controls change.
 - Saves palette and camera settings in the current browser's local storage.
 - Exports the currently loaded and modified map as a MapLibre Style JSON file.
@@ -42,8 +42,8 @@ The initial map center is a neutral sample view in central Berlin. Drag the map 
 Use the color pickers to adjust the Violet Night palette. The map is restyled live. The left settings panel scrolls independently on desktop.
 
 - Road hierarchy: each road class gets a separate color, while road casings use their own darker color.
-- 3D buildings: main extrusion color, footprint outline, opacity, and visual height multiplier.
-- Camera: pitch and zoom sliders, plus quick 2D/3D buttons. When the visible map width exceeds 5 km, the prototype automatically switches to a flat 2D view and hides 3D extrusions; it restores the selected 3D pitch when zoomed in.
+- 3D buildings: brighter extrusion color, footprint outline, and opacity. Extrusion uses the tile's mapped render_height / height values without artificial height exaggeration.
+- Camera: pitch and zoom sliders, plus quick 2D/3D buttons. The default 3D pitch is 73°. When the visible map width exceeds 5 km, the prototype automatically switches to a flat 2D view and hides 3D extrusions; it restores the selected 3D pitch when zoomed in.
 - Presets: Violet Night, Deep Purple, and Neon Violet.
 - Export: downloads wemaps-violet-night.style.json.
 - Import: loads a previously exported MapLibre Style JSON.
@@ -52,10 +52,12 @@ The exported style retains its underlying vector source, glyph, sprite, and tile
 
 ## Known limitations
 
-- The prototype uses a third-party style/data service. Initial loading speed depends on the network, CDN, and tile provider. The map uses a lower tile-cache depth, disables label fade animation, and turns off WebGL antialiasing to reduce rendering work. Availability, coverage, update frequency, and terms are controlled by that provider.
+- The prototype uses a third-party style/data service. Initial loading speed still depends on the network, CDN, and tile provider. Camera easing, label fading, a deeper tile cache, progressive tile loading, and WebGL antialiasing are enabled to favor smoother movement. Extra detail layers are gated by zoom to avoid drawing them at distant scales. Availability, coverage, update frequency, and terms are controlled by that provider.
 - 3D building quality depends on the building data and height attributes available in each area.
-- The extrusion color is shared by roof and walls; MapLibre's vertical gradient shades the sides. The footprint outline is controlled separately. The height multiplier is a visual preview control, not a change to source building measurements.
-- Some road styles have multiple casing, bridge, and tunnel layers. The editor changes them by inspecting the layer source and filter; inspect the exported JSON before using it in production.
+- The extrusion color is shared by roof and walls; MapLibre's vertical gradient shades the sides. The footprint outline is controlled separately. OpenMapTiles exposes render_height and render_min_height, which may be derived from explicit height or building levels; no arbitrary 9 m fallback or height multiplier is applied. Buildings without usable height data are not given an invented height.
+- Roads use class-based widths, layered casings, a soft offset shadow, a subtle top sheen, and zoom-gated dashed lane-like markings. These lane markings are a visual cue, not surveyed lane geometry or an exact lane count: the standard OpenMapTiles transportation schema does not expose the OSM lanes tag.
+- Woodland polygons receive tiny repeating tree-canopy symbols only at close zoom. If a richer tile source exposes leaf_type, conifer and broadleaf patterns can be selected separately. The standard OpenMapTiles landcover schema has class and subclass but does not guarantee species or individual tree points, so the generic pattern is not a claim about the exact trees in that forest.
+- Beach and sand subclasses receive a dark sand-gold color.
 - This prototype does not implement route calculation, GPS tracking, speed limits, camera alerts, search, or weather.
 - It does not download offline areas.
 
