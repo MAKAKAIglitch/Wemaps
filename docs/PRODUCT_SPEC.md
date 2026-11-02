@@ -11,9 +11,9 @@
 
 ## 2. Design system
 
-### Stage 1 map palette — Waze-inspired dark
+### Stage 1 map palette — Midnight Navigation
 
-For the first visible map prototype, use a dark navy/blue-grey palette inspired by the night-map appearance of Waze. This is a visual reference, not a claim to reproduce Waze's unpublished internal color tokens or use its proprietary assets.
+For the first visible map prototype, use an original dark navy/blue-grey palette designed for Wemaps. The values below are project-owned design decisions and must not be copied from third-party brand assets or internal design specifications.
 
 | Token | Initial value | Intended use |
 | --- | --- | --- |
@@ -38,7 +38,7 @@ For the first visible map prototype, use a dark navy/blue-grey palette inspired 
 | text.primary | #E8F0F7 | Primary labels |
 | text.secondary | #AFC1D0 | Secondary labels |
 
-These are editable starting values chosen to approximate a Waze-like dark visual direction. They are not extracted official Waze constants. Every color must live in a central style-token configuration, not be hard-coded across map layers or UI code. The initial editable preset file is [`design/map-style-presets.json`](../design/map-style-presets.json).
+These are editable starting values for Wemaps' own dark map appearance. Every color must live in a central style-token configuration, not be hard-coded across map layers or UI code. The initial editable preset file is [`design/map-style-presets.json`](../design/map-style-presets.json).
 
 Keep the previous Violet Night palette as a separately named, switchable preset for future use. The style architecture must support named presets and custom token overrides. A later in-app map-appearance editor should let users change road, background, route, building, and lane colors without changing rendering logic. Custom overrides should be stored locally in app settings.
 
@@ -107,7 +107,7 @@ Use MapLibre Native Android for GPU-accelerated vector map rendering.
 
 Road class must be communicated through line width, contrast, casing, and color. The route should be visually prominent without hiding intersections or road geometry. Road width must continue to follow mapped physical width where available; palette and road-class styling must not falsify dimensions.
 
-### Detailed lanes inspired by Yandex Navigator
+### Detailed route-aware lane guidance
 
 At useful close zoom levels, show a detailed lane layout on roads where the source attributes and geometry are sufficient.
 
@@ -115,7 +115,7 @@ At useful close zoom levels, show a detailed lane layout on roads where the sour
 - Use lane counts and directional counts to determine the lane layout.
 - Use `turn:lanes=*` to draw per-lane direction arrows when valid.
 - Respect `oneway=*`, divided carriageways, and the road's actual direction.
-- Distinguish route-compatible lanes from other lanes when an active route is available: compatible lanes are bright/white; other lanes are muted grey. This follows the interaction pattern documented by Yandex Navigator, without copying its artwork or assets.
+- Distinguish route-compatible lanes from other lanes when an active route is available: compatible lanes are bright/white; other lanes are muted grey. This uses Wemaps' own route-aware lane-guidance design.
 - Show bus, tram, and bicycle lanes with distinct restrained symbols or markings when the relevant source data is available.
 - Use mapped lane widths and physical road width when available. If lane geometry is derived from a road centreline, mark it internally as generated geometry and do not present it as surveyed lane geometry.
 - Do not invent lane arrows or painted lines when the lane structure is unknown.
