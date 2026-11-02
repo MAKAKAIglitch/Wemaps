@@ -1243,6 +1243,8 @@
           : null);
 
       if (element.type === "way" && tags.highway && geometry.length >= 2) {
+        if (seen.has(id)) return;
+        seen.add(id);
         const width = parseOsmWidthMeters(tags);
         const lanes = parseOsmLaneCount(tags);
         if (width) {
