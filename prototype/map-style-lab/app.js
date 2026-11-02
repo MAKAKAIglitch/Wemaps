@@ -414,7 +414,7 @@
     ];
   }
 
-  function roadWidthExpression(multiplier = 1, extraMeters = 0) {
+  function roadWidthExpression(multiplier = 1, extraMeters = 0, widthFactor = 1) {
     const lanes = roadLaneCountExpression();
     const hasLaneTags = [
       "any",
@@ -453,7 +453,7 @@
       "pedestrian", 3.2,
       5.0
     ];
-    const realWorldWidthMeters = [
+    const physicalWidthMeters = [
       "case",
       validWidthTag, widthTag,
       ["all", hasLaneTags, [">", lanes, 0]], laneWidthMeters,
@@ -461,17 +461,19 @@
     ];
 
     const latitude = map ? map.getCenter().lat : 52.52;
-    const circumference = 40075016.68557849 * Math.max(0.087, Math.cos(latitude * Math.PI / 180));
-    const scaleStops = ["interpolate", ["exponential", 2], ["zoom"]];
+    const circumferenceAtLatitude = 40075016.68557849
+      * Math.max(0.087, Math.cos(latitude * Math.PI / 180));
+    const expression = ["interpolate", ["exponential", 2], ["zoom"]];
     for (let zoom = 5; zoom <= 20; zoom += 1) {
-      scaleStops.push(zoom, (512 * Math.pow(2, zoom)) / circumference);
+      const pixelsPerMeter = (512 * Math.pow(2, zoom)) / circumferenceAtLatitude;
+      expression.push(zoom, [
+        "*",
+        ["+", ["*", physicalWidthMeters, multiplier], extraMeters],
+        pixelsPerMeter,
+        widthFactor
+      ]);
     }
-
-    return [
-      "*",
-      ["+", ["*", realWorldWidthMeters, multiplier], extraMeters],
-      scaleStops
-    ];
+    return expression;
   }
 
   function refreshLayerCache() {
@@ -979,13 +981,15 @@
       ctx.strokeStyle = "#ff9b83";
       ctx.lineWidth = 3.5;
       ctx.stroke();
-      ctx.fillStyle = "#f5c1ff";
-      ctx.beginPath();
-      ctx.moveTo(32, 5);
-      ctx.lineTo(22, 26);
-      ctx.lineTo(42, 26);
-      ctx.closePath();
-      ctx.fill();
+      if (kind === "camera-direction") {
+        ctx.fillStyle = "#f5c1ff";
+        ctx.beginPath();
+        ctx.moveTo(32, 5);
+        ctx.lineTo(22, 26);
+        ctx.lineTo(42, 26);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.fillStyle = "#fff4ff";
       ctx.beginPath();
       ctx.arc(32, 38, 8, 0, Math.PI * 2);
@@ -1020,6 +1024,9 @@
   function registerOverlayImages() {
     if (!map.hasImage("wemaps-speed-camera")) {
       map.addImage("wemaps-speed-camera", makeOverlayIcon("camera"), { pixelRatio: 2 });
+    }
+    if (!map.hasImage("wemaps-speed-camera-direction")) {
+      map.addImage("wemaps-speed-camera-direction", makeOverlayIcon("camera-direction"), { pixelRatio: 2 });
     }
     if (!map.hasImage("wemaps-junction-marker")) {
       map.addImage("wemaps-junction-marker", makeOverlayIcon("junction"), { pixelRatio: 2 });
@@ -1122,7 +1129,12 @@
         source,
         filter: ["==", ["get", "kind"], "camera"],
         layout: {
-          "icon-image": "wemaps-speed-camera",
+          "icon-image": [
+            "case",
+            ["==", ["get", "directionKnown"], "yes"],
+            "wemaps-speed-camera-direction",
+            "wemaps-speed-camera"
+          ],
           "icon-size": ["interpolate", ["linear"], ["zoom"], 11.5, 0.48, 16, 0.7, 19, 0.82],
           "icon-rotate": ["to-number", ["get", "direction"], 0],
           "icon-rotation-alignment": "map",
@@ -1323,7 +1335,7 @@
       for (let divider = 1; divider < lanes; divider += 1) {
         const id = "wemaps-road-lanes-" + lanes + "-" + divider;
         if (map.getLayer(id)) {
-          map.setPaintProperty(id, "line-offset", ["*", roadWidthExpression(1, 0), divider / lanes - 0.5]);
+          map.setPaintProperty(id, "line-offset", roadWidthExpression(1, 0, divider / lanes - 0.5));
         }
       }
     }
@@ -1434,20 +1446,7 @@
       }
     });
 
-    // Keep the extra road sheen and lane marks in sync with the road-width control.
-    if (map.getLayer("wemaps-road-depth-shadow")) {
-      map.setPaintProperty("wemaps-road-depth-shadow", "line-width", roadWidthExpression(1.7, 2.0));
-    }
-    if (map.getLayer("wemaps-road-top-sheen")) {
-      map.setPaintProperty("wemaps-road-top-sheen", "line-width", roadWidthExpression(0.33, 0));
-    }
-    if (map.getLayer("wemaps-road-lane-markings")) {
-      map.setPaintProperty("wemaps-road-lane-markings", "line-width", [
-        "interpolate", ["linear"], ["zoom"],
-        14.5, 0.65 * roadWidthScale,
-        18, 1.05 * roadWidthScale
-      ]);
-    }
+    refreshRoadWidthExpressions();
 
     refreshAdaptiveCamera(false);
   }
