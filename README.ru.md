@@ -91,15 +91,13 @@ Linux / macOS:
 ./gradlew :app:assembleDebug
 ```
 
-Windows — дважды нажми `build-windows.bat` или запусти:
+Windows — дважды нажми `build-apk.bat` или `build-windows.bat`:
 
 ```bat
-build-windows.bat
+build-apk.bat
 ```
 
-Модульный Windows-билдер использует уже установленный Android SDK. Он ищет его через `ANDROID_SDK_ROOT`, `ANDROID_HOME`, `local.properties` текущего и других Android-проектов, сохранённые настройки Android Studio, `PATH` и стандартные каталоги SDK. Если автоматический поиск не определит путь, появится окно выбора существующей папки SDK. Скрипт проверяет Android SDK Platform 37.1 и Build-Tools 36.0.0; если какого-то пакета не хватает, он сначала спросит разрешение и добавит только недостающие компоненты в существующий SDK. Android Studio переустанавливать не нужно. Лог сборки сохраняется в `build-windows.log`, а APK копируется в корень репозитория под именем `Wemaps-debug.apk`.
-
-Windows-лаунчер автоматически ищет подходящий JDK в `JAVA_HOME`, `JDK_HOME`, `PATH`, встроенной JBR-среде Android Studio, JDK от JetBrains Toolbox и стандартных каталогах установки. Сам JDK 17 или новее должен быть установлен, но вручную прописывать `JAVA_HOME` обычно не требуется. Скрипт также загружает закреплённую версию Gradle и проверяет её SHA-256 перед запуском.
+Windows-сборка устроена по той же модульной схеме, что и в Clear GPS: отдельные `ensure-java.ps1`, `ensure-android-sdk.ps1`, `check-environment.ps1`, `ensure-gradle.ps1` и `gradle-runner.ps1`. Сборщик ищет полноценный JDK (17–24), Android SDK и точные компоненты Wemaps: Platform 37.1 и Build-Tools 36.0.0. Если совместимый JDK не найден, он загружает Eclipse Temurin JDK 21 и проверяет опубликованную Adoptium контрольную сумму. Gradle 9.5.1 загружается в пользовательскую папку Gradle и проверяется по официальной SHA-256. Уже установленные и прошедшие проверку компоненты повторно не скачиваются. Недостающие пакеты Android SDK устанавливаются после подтверждения; если выбранный SDK не может создать служебный файл установки, сборщик повторяет установку в `%LOCALAPPDATA%\\Wemaps\\AndroidSdk`. Выбранный путь SDK записывается в игнорируемый Git файл `local.properties`. Логи хранятся в `%LOCALAPPDATA%\\Wemaps\\logs`, а готовый APK сохраняется как `dist/Wemaps-debug.apk`.
 
 Репозиторий также можно открыть как Gradle-проект в Android Studio.
 
