@@ -65,7 +65,7 @@ This roadmap describes intended development order. It contains no delivery dates
 ## Stage 3 — Device location
 
 - [x] Add foreground-only runtime permission flow for approximate and precise location.
-- [x] Show the current device position with a geographic pointer on the map.
+- [x] Show the current device position with a small blue geographic dot on the map.
 - [ ] Show a visible location-accuracy state.
 - [ ] Implement follow mode and smooth camera tracking.
 - [ ] Show GPS-derived speed with quality checks.
