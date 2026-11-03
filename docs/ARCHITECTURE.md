@@ -158,9 +158,9 @@ The current Android prototype uses Android `LocationManager` with runtime approx
 - `ACCESS_COARSE_LOCATION` allows a network-derived approximate fix.
 - `ACCESS_FINE_LOCATION` enables GPS and network providers.
 - Updates are registered only while the Activity is started and removed when it stops.
-- The current position is rendered as a MapLibre GeoJSON point with a custom geographic pointer.
+- The current position is rendered as a small, non-rotating blue dot in a MapLibre GeoJSON point layer.
 - The first valid fix recentres the map; the location control can recenter it again.
-- The pointer uses Android's course bearing only when a usable movement bearing is reported; otherwise it retains the last reliable course.
+- The basic location dot does not rotate. The device course remains available in the location model for future navigation features.
 - No background-location permission or background tracking is used.
 
 The current prototype does not yet display a user-facing accuracy radius or GPS speed. The `accuracyMeters` and `speedMetersPerSecond` values are retained in the in-memory location model for later UI work. Avoid using a single noisy fix as a reliable movement direction. Keep location history on-device unless a clearly disclosed feature requires a provider request.
